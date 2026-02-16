@@ -290,68 +290,87 @@ def add_swap_bands(fig, x_vals, swap_active_flags, row=None, col=None):
 
 def direction_overview_fig(df: pd.DataFrame, direction: str, dir_label: str) -> go.Figure:
     wd = df[(df["day_type"] == "Weekday") & (df["direction"] == direction)]
-    labels, bef_med, aft_med, bef_p90, aft_p90, active = [], [], [], [], [], []
+    tick_labels, bef_med, aft_med, bef_p90, aft_p90, active = [], [], [], [], [], []
     for _, __, label in TIME_BUCKETS:
+        if "Early AM" in label:
+            continue  # Swap inactive overnight; long headways distort the y-axis
         sub = wd[wd["time_bucket"] == label]
         b = sub[sub["swap_period"] == "Before swap"]["headway_min"]
         a = sub[sub["swap_period"] == "After swap"]["headway_min"]
         if b.empty or a.empty: continue
-        labels.append(label.replace(" (", "<br>("))
+        tick_labels.append(label.replace(" (", "<br>("))
         bef_med.append(b.median()); aft_med.append(a.median())
         bef_p90.append(b.quantile(0.90)); aft_p90.append(a.quantile(0.90))
         active.append(label in SWAP_ACTIVE_BUCKETS)
 
+    # Use numeric x-axis so scatter markers can be offset to sit over their bar
+    n = len(tick_labels)
+    x_pos = list(range(n))
+    width = 0.35  # half-gap between before/after bars
+
     fig = go.Figure()
 
-    # Before bars
+    # Before bars — centred at x - width/2
     fig.add_trace(go.Bar(
         name="F Train (before Dec 8)",
-        x=labels, y=bef_med,
-        marker_color=BLUE_BEFORE,
-        offsetgroup=0,
-        hovertemplate="<b>%{x}</b><br>Before: %{y:.1f} min<extra></extra>",
+        x=[xi - width / 2 for xi in x_pos], y=bef_med,
+        width=width, marker_color=BLUE_BEFORE,
+        hovertemplate="<b>Before swap</b><br>Median: %{y:.1f} min<extra></extra>",
     ))
-    # After bars
+    # After bars — centred at x + width/2
     fig.add_trace(go.Bar(
         name="M Train (after Dec 8)",
-        x=labels, y=aft_med,
-        marker_color=RED_AFTER,
-        offsetgroup=1,
-        hovertemplate="<b>%{x}</b><br>After: %{y:.1f} min<extra></extra>",
+        x=[xi + width / 2 for xi in x_pos], y=aft_med,
+        width=width, marker_color=RED_AFTER,
+        hovertemplate="<b>After swap</b><br>Median: %{y:.1f} min<extra></extra>",
     ))
-    # 90th percentile markers
-    for i, (bp, ap) in enumerate(zip(bef_p90, aft_p90)):
-        lbl = labels[i]
-        fig.add_trace(go.Scatter(
-            x=[lbl], y=[bp], mode="markers", name="90th pct (before)" if i == 0 else None,
-            marker=dict(symbol="triangle-up", size=12, color=BLUE_BEFORE, line=dict(color="white", width=1)),
-            showlegend=(i == 0),
-            hovertemplate=f"90th pct before: {bp:.1f} min<extra></extra>",
-        ))
-        fig.add_trace(go.Scatter(
-            x=[lbl], y=[ap], mode="markers", name="90th pct (after)" if i == 0 else None,
-            marker=dict(symbol="triangle-up", size=12, color=RED_AFTER, line=dict(color="white", width=1)),
-            showlegend=(i == 0),
-            hovertemplate=f"90th pct after: {ap:.1f} min<extra></extra>",
-        ))
 
-    # Percentage annotations
+    # 90th percentile markers — offset to match their bar
+    fig.add_trace(go.Scatter(
+        name="90th pct (before)",
+        x=[xi - width / 2 for xi in x_pos], y=bef_p90,
+        mode="markers",
+        marker=dict(symbol="triangle-up", size=12, color=BLUE_BEFORE, line=dict(color="white", width=1)),
+        hovertemplate="90th pct (before): %{y:.1f} min<extra></extra>",
+    ))
+    fig.add_trace(go.Scatter(
+        name="90th pct (after)",
+        x=[xi + width / 2 for xi in x_pos], y=aft_p90,
+        mode="markers",
+        marker=dict(symbol="triangle-up", size=12, color=RED_AFTER, line=dict(color="white", width=1)),
+        hovertemplate="90th pct (after): %{y:.1f} min<extra></extra>",
+    ))
+
+    # Percentage change annotations — centred over each pair
     for i, (bv, av) in enumerate(zip(bef_med, aft_med)):
         pct = (av - bv) / bv * 100
         color = RED_AFTER if pct > 0 else GREEN_OK
         fig.add_annotation(
-            x=labels[i], y=max(av, bef_p90[i]) + 1.2,
+            x=x_pos[i], y=max(aft_p90[i], bef_p90[i]) + 1.2,
             text=f"<b>{pct:+.0f}%</b>",
             showarrow=False, font=dict(size=12, color=color),
             bgcolor="rgba(0,0,0,0)",
         )
 
-    add_swap_bands(fig, labels, active)
+    # Swap-active shading using numeric x positions
+    for i, is_active in enumerate(active):
+        if is_active:
+            fig.add_vrect(
+                x0=x_pos[i] - 0.5, x1=x_pos[i] + 0.5,
+                fillcolor=RED_AFTER, opacity=0.06,
+                layer="below", line_width=0,
+            )
 
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text=f"<b>{dir_label}</b> — All Time Periods", font=dict(size=15)),
-        barmode="group",
+        barmode="overlay",  # bars are already manually offset; overlay prevents double-grouping
+        xaxis=dict(
+            tickmode="array",
+            tickvals=x_pos,
+            ticktext=tick_labels,
+            gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, tickfont=dict(size=11),
+        ),
         yaxis_title="Median minutes between trains",
         height=420,
         legend=dict(**LEGEND_BASE, orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
@@ -500,7 +519,7 @@ def weekend_fig(df: pd.DataFrame) -> go.Figure:
 
 def sensitivity_fig(df: pd.DataFrame) -> go.Figure:
     from datetime import date as date_type
-    storm_date = date_type(2025, 1, 25)
+    storm_date = date_type(2026, 1, 25)
     wd_swap = df[df["is_weekday"] & (df["arrival_date"] >= SWAP_DATE) & df["within_swap_window"]]
 
     pre     = df[df["is_weekday"] & (df["arrival_date"] < SWAP_DATE) & df["within_swap_window"]]

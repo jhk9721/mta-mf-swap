@@ -264,15 +264,16 @@ PLOTLY_LAYOUT = dict(
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor=MID_NAVY,
     font=dict(family="DM Sans, sans-serif", color=TEXT_LIGHT),
-    legend=dict(
-        bgcolor="rgba(0,0,0,0)",
-        bordercolor=LIGHT_NAVY,
-        borderwidth=1,
-        font=dict(size=12),
-    ),
     xaxis=dict(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, tickfont=dict(size=11)),
     yaxis=dict(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, tickfont=dict(size=11)),
     margin=dict(l=10, r=10, t=50, b=10),
+)
+
+LEGEND_BASE = dict(
+    bgcolor="rgba(0,0,0,0)",
+    bordercolor=LIGHT_NAVY,
+    borderwidth=1,
+    font=dict(size=12),
 )
 
 def add_swap_bands(fig, x_vals, swap_active_flags, row=None, col=None):
@@ -353,7 +354,7 @@ def direction_overview_fig(df: pd.DataFrame, direction: str, dir_label: str) -> 
         barmode="group",
         yaxis_title="Median minutes between trains",
         height=420,
-        legend=dict(**PLOTLY_LAYOUT["legend"], orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        legend=dict(**LEGEND_BASE, orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
     return fig
 
@@ -389,7 +390,7 @@ def long_wait_fig(df: pd.DataFrame, direction: str, dir_label: str) -> go.Figure
         yaxis_title="% of train intervals",
         yaxis_range=[0, max(max(bef_pcts), max(aft_pcts)) * 1.35],
         height=400,
-        legend=dict(**PLOTLY_LAYOUT["legend"], orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        legend=dict(**LEGEND_BASE, orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
     return fig
 
@@ -437,7 +438,7 @@ def evening_spotlight_fig(df: pd.DataFrame) -> go.Figure:
         barmode="group",
         yaxis_title="Median minutes between trains",
         height=480,
-        legend=dict(**PLOTLY_LAYOUT["legend"], orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1),
+        legend=dict(**LEGEND_BASE, orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1),
     )
     return fig
 
@@ -490,7 +491,7 @@ def weekend_fig(df: pd.DataFrame) -> go.Figure:
         ),
         barmode="group",
         height=440,
-        legend=dict(**PLOTLY_LAYOUT["legend"], orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1),
+        legend=dict(**LEGEND_BASE, orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1),
     )
     fig.update_xaxes(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY)
     fig.update_yaxes(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, title_text="Median minutes between trains", col=1)

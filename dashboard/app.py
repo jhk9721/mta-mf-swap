@@ -365,15 +365,15 @@ def direction_overview_fig(df: pd.DataFrame, direction: str, dir_label: str) -> 
         **PLOTLY_LAYOUT,
         title=dict(text=f"<b>{dir_label}</b> — All Time Periods", font=dict(size=15)),
         barmode="overlay",  # bars are already manually offset; overlay prevents double-grouping
-        xaxis=dict(
-            tickmode="array",
-            tickvals=x_pos,
-            ticktext=tick_labels,
-            gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, tickfont=dict(size=11),
-        ),
         yaxis_title="Median minutes between trains",
         height=420,
         legend=dict(**LEGEND_BASE, orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    )
+    # Set tick labels separately to avoid conflict with PLOTLY_LAYOUT's xaxis key
+    fig.update_xaxes(
+        tickmode="array",
+        tickvals=x_pos,
+        ticktext=tick_labels,
     )
     return fig
 

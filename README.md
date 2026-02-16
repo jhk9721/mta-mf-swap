@@ -3,12 +3,18 @@ Comparing Roosevelt Island headways before and after F/M swap
 
 # What we did, start to finish
 Last December, the MTA swapped which train serves Roosevelt Island on weekdays. The F train, which had been running there since the 80s, was replaced by the M train during the day. The MTA claimed this would improve reliability for the broader system and promised that Roosevelt Island riders would only wait about one extra minute.
+
 A group of Roosevelt Island residents felt their lived experience did not match this claim, so they decided to check.
+
 The MTA publishes real-time train location data — essentially a live feed of where every train in the system is at any given moment. A website called subwaydata.nyc archives that feed every single day. We downloaded nearly 40,000 individual train arrival records for Roosevelt Island, covering about five months, including before the swap and after it.
+
 We then measured something called a "headway" (how many minutes passed between one train arriving and the next one arriving). We did this for every train, every day, to answer the question: Are trains coming more or less frequently than before?
+
 The answer was stark. During the evening commute home, the gap between trains more than doubled, from about 4 minutes to about 8 minutes. During the morning commute to Manhattan, it went up 71%. Every single time period got worse. The MTA's promised "about 1 extra minute" turned out to be an extra 3 to 4 minutes in practice.
+
 We then found the MTA's own internal planning document from before the swap was implemented. It was signed by their Chief of Operations Planning and approved all the way up to the MTA President. That document explicitly admitted Roosevelt Island would face longer waits — and made a specific written promise to add extra M train service to mitigate the impact to roughly one extra minute of wait time. We can now show, with their own data, that the promise was not kept.
 We also built a public interactive website where anyone can explore the data themselves. And we put everything, including the raw data, the code, and the methodology, on GitHub so that anyone, including the MTA, can check our work.
+
 Roosevelt Island has one subway station and no alternative line. When service gets worse there, residents have nowhere else to go. That's why this matters, and why having documentation that holds the MTA to its own written commitments is worth the effort.
 
 # Methodology

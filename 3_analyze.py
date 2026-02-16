@@ -1,6 +1,10 @@
 """
 SCRIPT 3: ANALYZE (v4 — consistent time buckets, weekday/weekend labels)
 =========================================================================
+DIRECTION CONVENTION:
+  N (B06N) = Northbound = toward Queens (trains leaving Manhattan, commute HOME)
+  S (B06S) = Southbound = toward Manhattan (trains to work, MORNING commute)
+  Roosevelt Island is on the 63rd Street line; "northbound" is geographically NE toward Queens.
 Key changes from v3:
   - Five consistent clock-based time buckets apply to ALL days
   - Weekday and weekend get different LABELS for the same buckets
@@ -202,7 +206,7 @@ def summarize_headways(df_hw: pd.DataFrame) -> pd.DataFrame:
         p90=lambda x: x.quantile(0.90),
     ).round(1).reset_index()
     s["direction"] = s["direction"].map(
-        {"N": "Northbound (→ Manhattan)", "S": "Southbound (→ Queens)"}
+        {"N": "Northbound (→ Queens/Home)", "S": "Southbound (→ Manhattan)"}
     )
     return s.sort_values(["day_type", "time_bucket", "direction", "swap_period"])
 
@@ -216,7 +220,7 @@ def plot_distribution(df_hw: pd.DataFrame, day_type: str, results_dir: str):
     """
     Before/after violin plots for each time bucket.
     One chart for weekdays, one for weekends.
-    Northbound only (the commute direction residents care most about).
+    Southbound (→ Manhattan) shown as primary commute direction for morning rush.
     """
     buckets = _bucket_order(df_hw, day_type)
     n = len(buckets)
@@ -227,7 +231,7 @@ def plot_distribution(df_hw: pd.DataFrame, day_type: str, results_dir: str):
     day_label = "Weekdays" if day_type == "Weekday" else "Weekends"
     fig.suptitle(
         f"Roosevelt Island — {day_label} Headway Distribution by Time Period\n"
-        "Northbound (→ Manhattan) | Before vs. After F/M Swap",
+        "Southbound (→ Manhattan) | Before vs. After F/M Swap",
         fontsize=13, fontweight="bold"
     )
 
@@ -308,7 +312,7 @@ def plot_hourly_headways(df_hw: pd.DataFrame, results_dir: str):
     """Full 24-hour headway profile, weekday vs weekend, before vs after."""
     fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
     fig.suptitle(
-        "Roosevelt Island — Average Northbound Headway by Hour\n"
+        "Roosevelt Island — Average Headway by Hour (Both Directions)\n"
         "Before vs. After F/M Swap",
         fontsize=13, fontweight="bold"
     )
@@ -395,7 +399,7 @@ def plot_daily_median_headway(df_hw: pd.DataFrame, results_dir: str):
                         facecolor="white", edgecolor="black"))
 
     ax.set_title(
-        "Roosevelt Island — Daily Median Northbound Headway\n"
+        "Roosevelt Island — Daily Median Headway (Southbound/Manhattan-bound)\n"
         "Weekday Morning Rush (6–9 AM) | Oct 2025–Feb 2026",
         fontsize=13, fontweight="bold"
     )
@@ -478,7 +482,7 @@ STUDY DESIGN
     Partially affects: Night (7:00–9:30 PM only)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-WEEKDAYS — Northbound (→ Manhattan)
+WEEKDAYS — Southbound (→ Manhattan) [primary commute direction]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [2] Morning Rush (6–9 AM) ★ SWAP AFFECTS THIS PERIOD
   Before: median {med('Weekday','2:','N','Before swap')} min | 90th pct {p90('Weekday','2:','N','Before swap')} min
@@ -506,7 +510,7 @@ WEEKDAYS — Northbound (→ Manhattan)
   Change: {chg('Weekday','1:','N')}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-WEEKENDS — Northbound (→ Manhattan)
+WEEKENDS — Southbound (→ Manhattan)
 All periods: F train both before and after swap.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [1] Early AM (12–6 AM)

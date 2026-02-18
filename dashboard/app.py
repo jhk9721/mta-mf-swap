@@ -279,7 +279,7 @@ st.markdown(f"""
     letter-spacing: 0.04em;
     margin-bottom: 0.25rem;
   }}
-  .qa-verdict.no  {{ color: {GREEN_OK}; }}
+  .qa-verdict.no  {{ color: {MTA_ORANGE}; }}
   .qa-verdict.yes {{ color: {RED_AFTER}; }}
   .qa-q {{
     font-weight: 600;
@@ -309,10 +309,15 @@ st.markdown(f"""
 
   /* ── Mobile responsive ── */
   @media (max-width: 768px) {{
-    .header-title   {{ font-size: 1.8rem; }}
-    .big-stat-number {{ font-size: 2rem; }}
-    .metric-card    {{ margin-bottom: 1rem; }}
-    .nav-bar a      {{ margin: 0 0.5rem; font-size: 0.78rem; }}
+    .header-title    {{ font-size: 1.6rem !important; line-height: 1.2 !important; }}
+    .header-subtitle {{ font-size: 0.9rem !important; }}
+    .big-stat-number {{ font-size: 2rem !important; }}
+    .metric-value    {{ font-size: 2rem !important; }}
+    .metric-label    {{ font-size: 0.65rem !important; }}
+    .metric-card     {{ margin-bottom: 1rem; }}
+    .nav-bar a       {{ margin: 0 0.5rem; font-size: 0.78rem; }}
+    /* Force Streamlit columns to stack on narrow screens */
+    [data-testid="column"] {{ width: 100% !important; flex: 100% !important; }}
   }}
 </style>
 """, unsafe_allow_html=True)
@@ -345,6 +350,14 @@ ev_delta      = ev_nb_a - ev_nb_b
 am_delta      = am_sb_a - am_sb_b
 monthly_extra = am_delta * 2 * 22
 
+# Extreme wait statistics — both directions, swap-active hours, weekdays
+_ew_bef = df[df["within_swap_window"] & (df["day_type"] == "Weekday") & (df["swap_period"] == "Before swap")]["headway_min"]
+_ew_aft = df[df["within_swap_window"] & (df["day_type"] == "Weekday") & (df["swap_period"] == "After swap")]["headway_min"]
+_bef_days = df[df["is_weekday"] & (df["arrival_date"] < SWAP_DATE)]["arrival_date"].nunique()
+_aft_days = df[df["is_weekday"] & (df["arrival_date"] >= SWAP_DATE)]["arrival_date"].nunique()
+ew_bef = {t: (100*(_ew_bef > t).mean(), (_ew_bef > t).sum()/_bef_days) for t in [15, 20, 25]}
+ew_aft = {t: (100*(_ew_aft > t).mean(), (_ew_aft > t).sum()/_aft_days) for t in [15, 20, 25]}
+
 
 # ── Header ────────────────────────────────────────────────────────────────────
 st.markdown(f"""
@@ -368,6 +381,9 @@ st.markdown(f"""
   <a href="#mta-promise">MTA's Promise</a>
   <a href="#data">The Data</a>
   <a href="#action">Take Action</a>
+  <span style="margin:0 1rem; color:{LIGHT_NAVY};">|</span>
+  <a href="https://github.com/jhk9721/mta-mf-swap" target="_blank"
+     style="color:{TEXT_LIGHT}; font-weight:600;">📊 GitHub</a>
 </div>
 """, unsafe_allow_html=True)
 
@@ -675,9 +691,11 @@ def sensitivity_fig(df: pd.DataFrame) -> go.Figure:
     post_pre_storm = wd_swap[wd_swap["arrival_date"] < storm_date]
     post_storm     = wd_swap[wd_swap["arrival_date"] >= storm_date]
 
+    # Color scheme: Blue (F train) → Light red (M pre-storm) → Dark red (M post-storm)
+    # Avoids using orange (MTA brand color) for a data point that's neither "before" nor "after"
     groups = [
         ("Pre-swap<br>(F train)", pre, BLUE_BEFORE),
-        ("Post-swap<br>before storm", post_pre_storm, AMBER_SWAP),
+        ("Post-swap<br>before storm", post_pre_storm, "#E89580"),
         ("Post-storm<br>(Jan 25+)", post_storm, RED_AFTER),
     ]
     labels  = [g[0] for g in groups]
@@ -777,6 +795,100 @@ with col2:
 st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 st.markdown('<a id="commuters"></a>', unsafe_allow_html=True)
 st.markdown('<div class="section-head">How Often Do You Wait 10+ Minutes?</div>', unsafe_allow_html=True)
+
+# ── Extreme waits callout ─────────────────────────────────────────────────────
+st.markdown(f"""
+<div style='background:{MID_NAVY}; border-left:4px solid {MTA_ORANGE}; padding:1.5rem;
+            border-radius:0 8px 8px 0; margin:1.5rem 0 0.5rem;'>
+  <div style='font-size:0.8rem; font-weight:700; color:{MTA_ORANGE}; letter-spacing:0.1em;
+              text-transform:uppercase; margin-bottom:0.75rem;'>
+    Extreme Wait Frequency — Both Directions Combined
+  </div>
+  <div style='font-size:0.88rem; color:{TEXT_MUTED}; margin-bottom:1.25rem;'>
+    Swap-active hours (weekdays, 6 AM–7 PM). How often do trains take 15, 20, or 25+ minutes to arrive?
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+col_before, col_spacer, col_after = st.columns([5, 1, 5])
+with col_before:
+    st.markdown(f"""
+    <div style='background:rgba(58,155,255,0.12); border:2px solid {BLUE_BEFORE};
+                border-radius:8px; padding:1.5rem;'>
+      <div style='text-align:center; font-size:1rem; font-weight:700; color:{BLUE_BEFORE};
+                  margin-bottom:1.5rem; letter-spacing:0.05em;'>F TRAIN (before Dec 8)</div>
+      <div style='margin:1.2rem 0;'>
+        <div style='font-size:1.9rem; font-weight:800; color:{BLUE_BEFORE};
+                    font-family:"Barlow Condensed",sans-serif;'>
+          15+ minutes: {ew_bef[15][0]:.1f}%
+        </div>
+        <div style='font-size:0.9rem; color:{TEXT_MUTED}; margin-top:0.3rem;'>
+          average {ew_bef[15][1]:.0f} intervals per day
+        </div>
+      </div>
+      <div style='margin:1.2rem 0;'>
+        <div style='font-size:1.9rem; font-weight:800; color:{BLUE_BEFORE};
+                    font-family:"Barlow Condensed",sans-serif;'>
+          20+ minutes: {ew_bef[20][0]:.1f}%
+        </div>
+        <div style='font-size:0.9rem; color:{TEXT_MUTED}; margin-top:0.3rem;'>
+          average {ew_bef[20][1]:.0f} intervals per day
+        </div>
+      </div>
+      <div style='margin:1.2rem 0;'>
+        <div style='font-size:1.9rem; font-weight:800; color:{BLUE_BEFORE};
+                    font-family:"Barlow Condensed",sans-serif;'>
+          25+ minutes: {ew_bef[25][0]:.1f}%
+        </div>
+        <div style='font-size:0.9rem; color:{TEXT_MUTED}; margin-top:0.3rem;'>
+          average &lt;1 interval per day
+        </div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+with col_after:
+    st.markdown(f"""
+    <div style='background:rgba(232,51,74,0.12); border:2px solid {RED_AFTER};
+                border-radius:8px; padding:1.5rem;'>
+      <div style='text-align:center; font-size:1rem; font-weight:700; color:{RED_AFTER};
+                  margin-bottom:1.5rem; letter-spacing:0.05em;'>M TRAIN (after Dec 8)</div>
+      <div style='margin:1.2rem 0;'>
+        <div style='font-size:1.9rem; font-weight:800; color:{RED_AFTER};
+                    font-family:"Barlow Condensed",sans-serif;'>
+          15+ minutes: {ew_aft[15][0]:.1f}%
+        </div>
+        <div style='font-size:0.9rem; color:{TEXT_MUTED}; margin-top:0.3rem;'>
+          average {ew_aft[15][1]:.0f} intervals per day
+        </div>
+      </div>
+      <div style='margin:1.2rem 0;'>
+        <div style='font-size:1.9rem; font-weight:800; color:{RED_AFTER};
+                    font-family:"Barlow Condensed",sans-serif;'>
+          20+ minutes: {ew_aft[20][0]:.1f}%
+        </div>
+        <div style='font-size:0.9rem; color:{TEXT_MUTED}; margin-top:0.3rem;'>
+          average {ew_aft[20][1]:.0f} intervals per day
+        </div>
+      </div>
+      <div style='margin:1.2rem 0;'>
+        <div style='font-size:1.9rem; font-weight:800; color:{RED_AFTER};
+                    font-family:"Barlow Condensed",sans-serif;'>
+          25+ minutes: {ew_aft[25][0]:.1f}%
+        </div>
+        <div style='font-size:0.9rem; color:{TEXT_MUTED}; margin-top:0.3rem;'>
+          average {ew_aft[25][1]:.0f} interval per day
+        </div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.markdown(f"""
+<div style='font-size:0.82rem; color:{TEXT_MUTED}; font-style:italic; margin:0.75rem 0 2rem;
+            text-align:center;'>
+  Both directions combined, weekdays 6 AM–7 PM (swap-active hours).
+  "Intervals per day" = average number of train gaps exceeding the threshold across both platforms.
+</div>
+""", unsafe_allow_html=True)
 
 col1, col2 = st.columns(2)
 with col1:
@@ -966,13 +1078,16 @@ with col2:
     """, unsafe_allow_html=True)
 with col3:
     st.markdown(f"""
-    <a href="mailto:feedback@mta.info?subject=Roosevelt%20Island%20F%2FM%20Swap%20Concerns"
-       style="background:{MID_NAVY}; border:2px solid {MTA_ORANGE}; display:block; padding:1.5rem 1.2rem;
-              border-radius:8px; text-align:center; text-decoration:none;">
-      <div style="font-size:2rem;">🚇</div>
-      <div style="color:{TEXT_LIGHT}; font-weight:700; margin-top:0.5rem; font-size:0.95rem;">Contact the MTA</div>
-      <div style="color:{TEXT_MUTED}; font-size:0.78rem; margin-top:0.2rem;">feedback@mta.info</div>
-    </a>
+    <div style="background:{MID_NAVY}; border:2px solid {MTA_ORANGE}; display:block; padding:1.5rem 1.2rem;
+                border-radius:8px; text-align:center; cursor:pointer;"
+         onclick="navigator.clipboard.writeText(window.location.href).then(()=>{{
+           this.querySelector('.share-label').textContent='Link Copied!';
+           setTimeout(()=>{{this.querySelector('.share-label').textContent='Share This Analysis';}},2000);
+         }})">
+      <div style="font-size:2rem;">🔗</div>
+      <div class="share-label" style="color:{TEXT_LIGHT}; font-weight:700; margin-top:0.5rem; font-size:0.95rem;">Share This Analysis</div>
+      <div style="color:{TEXT_MUTED}; font-size:0.78rem; margin-top:0.2rem;">Copy link to clipboard</div>
+    </div>
     """, unsafe_allow_html=True)
 
 st.markdown(f"""

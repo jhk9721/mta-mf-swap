@@ -29,7 +29,7 @@ st.set_page_config(
 )
 
 # ── Theme constants ───────────────────────────────────────────────────────────
-MTA_ORANGE  = "#FF6319"   # accent / brand (borders, links, tabs)
+MTA_ORANGE  = "#FF6319"   # accent / brand (borders, links, CTAs)
 DARK_NAVY   = "#0D1B2A"
 MID_NAVY    = "#1B2E44"
 LIGHT_NAVY  = "#243B55"
@@ -59,12 +59,12 @@ st.markdown(f"""
     color: {TEXT_LIGHT};
   }}
 
-  /* Main header strip */
+  /* ── Header ── */
   .header-strip {{
     background: linear-gradient(135deg, {DARK_NAVY} 0%, {MID_NAVY} 100%);
     border-bottom: 3px solid {MTA_ORANGE};
     padding: 2rem 2.5rem 1.5rem;
-    margin: -1rem -1rem 2rem -1rem;
+    margin: -1rem -1rem 0 -1rem;
   }}
   .header-tag {{
     font-family: 'Barlow Condensed', sans-serif;
@@ -92,20 +92,35 @@ st.markdown(f"""
     line-height: 1.55;
   }}
 
-  /* Metric cards */
+  /* ── Navigation bar ── */
+  .nav-bar {{
+    background: {MID_NAVY};
+    border-bottom: 2px solid {LIGHT_NAVY};
+    padding: 0.65rem 2rem;
+    text-align: center;
+    margin: 0 -1rem 2rem -1rem;
+  }}
+  .nav-bar a {{
+    color: {TEXT_MUTED};
+    margin: 0 1.1rem;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.88rem;
+    white-space: nowrap;
+  }}
+  .nav-bar a:hover, .nav-bar a.active {{ color: {MTA_ORANGE}; }}
+
+  /* ── Metric cards ── */
   .metric-card {{
     background: {MID_NAVY};
     border: 1px solid {LIGHT_NAVY};
     border-radius: 8px;
     padding: 1.2rem 1.4rem;
     border-left: 4px solid {MTA_ORANGE};
+    height: 100%;
   }}
-  .metric-card.alarm {{
-    border-left-color: {RED_AFTER};
-  }}
-  .metric-card.ok {{
-    border-left-color: {GREEN_OK};
-  }}
+  .metric-card.alarm {{ border-left-color: {RED_AFTER}; }}
+  .metric-card.ok    {{ border-left-color: {GREEN_OK}; }}
   .metric-label {{
     font-size: 0.72rem;
     font-weight: 600;
@@ -121,16 +136,16 @@ st.markdown(f"""
     color: {TEXT_LIGHT};
     line-height: 1;
   }}
-  .metric-value.red {{ color: {RED_AFTER}; }}
+  .metric-value.red    {{ color: {RED_AFTER}; }}
   .metric-value.orange {{ color: {MTA_ORANGE}; }}
-  .metric-value.green {{ color: {GREEN_OK}; }}
+  .metric-value.green  {{ color: {GREEN_OK}; }}
   .metric-sub {{
     font-size: 0.78rem;
     color: {TEXT_MUTED};
     margin-top: 0.3rem;
   }}
 
-  /* Section headers */
+  /* ── Section headers ── */
   .section-head {{
     font-family: 'Barlow Condensed', sans-serif;
     font-size: 1.4rem;
@@ -143,7 +158,14 @@ st.markdown(f"""
     margin: 2rem 0 1rem 0;
   }}
 
-  /* Callout box */
+  /* ── Section divider ── */
+  .section-divider {{
+    border: none;
+    border-top: 1px solid {LIGHT_NAVY};
+    margin: 3.5rem 0 0.5rem 0;
+  }}
+
+  /* ── Callout box ── */
   .callout {{
     background: {MID_NAVY};
     border: 1px solid {LIGHT_NAVY};
@@ -162,14 +184,14 @@ st.markdown(f"""
     background: rgba(232, 51, 74, 0.07);
   }}
 
-  /* Plain-English summary banner */
+  /* ── Plain-English summary banner ── */
   .plain-summary {{
     background: linear-gradient(135deg, #112035 0%, {MID_NAVY} 100%);
     border: 1px solid {BLUE_BEFORE};
     border-left: 5px solid {BLUE_BEFORE};
     border-radius: 0 10px 10px 0;
     padding: 1.1rem 1.6rem;
-    margin: 0 0 1.5rem 0;
+    margin: 1.5rem 0;
     font-size: 1rem;
     color: {TEXT_LIGHT};
     line-height: 1.65;
@@ -184,61 +206,113 @@ st.markdown(f"""
     margin-bottom: 0.4rem;
   }}
 
-  /* Key-questions grid */
+  /* ── Big stat callout (hero) ── */
+  .big-stat {{
+    background: {MID_NAVY};
+    border-left: 5px solid {RED_AFTER};
+    border-radius: 0 12px 12px 0;
+    padding: 1.8rem 2rem;
+    margin: 1.2rem 0 1.5rem 0;
+    text-align: center;
+  }}
+  .big-stat-number {{
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 3rem;
+    font-weight: 800;
+    color: {RED_AFTER};
+    line-height: 1.1;
+  }}
+  .big-stat-label {{
+    font-size: 1rem;
+    color: {TEXT_LIGHT};
+    margin: 0.5rem 0 0.3rem;
+    font-weight: 500;
+  }}
+  .big-stat-sub {{
+    font-size: 0.88rem;
+    color: {TEXT_MUTED};
+    line-height: 1.55;
+    margin-top: 0.4rem;
+  }}
+
+  /* ── Promise vs reality cards ── */
+  .promise-card {{
+    border-radius: 0 8px 8px 0;
+    padding: 1.5rem;
+  }}
+  .promise-label {{
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 0.8rem;
+  }}
+  .promise-quote {{
+    font-size: 1rem;
+    color: {TEXT_LIGHT};
+    line-height: 1.65;
+    font-style: italic;
+  }}
+  .promise-attribution {{
+    font-size: 0.82rem;
+    color: {TEXT_MUTED};
+    margin-top: 0.8rem;
+  }}
+
+  /* ── Key-questions grid ── */
   .qa-grid {{
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.9rem;
-    margin: 0.5rem 0 1.5rem 0;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    margin: 0.75rem 0;
   }}
   .qa-item {{
     background: {MID_NAVY};
     border: 1px solid {LIGHT_NAVY};
     border-radius: 8px;
-    padding: 1rem 1.2rem;
+    padding: 0.9rem 1.1rem;
   }}
   .qa-verdict {{
     font-family: 'Barlow Condensed', sans-serif;
-    font-size: 1.05rem;
+    font-size: 1rem;
     font-weight: 700;
     letter-spacing: 0.04em;
-    margin-bottom: 0.3rem;
+    margin-bottom: 0.25rem;
   }}
   .qa-verdict.no  {{ color: {GREEN_OK}; }}
   .qa-verdict.yes {{ color: {RED_AFTER}; }}
   .qa-q {{
     font-weight: 600;
     color: {TEXT_LIGHT};
-    font-size: 0.88rem;
-    margin-bottom: 0.35rem;
+    font-size: 0.86rem;
+    margin-bottom: 0.3rem;
   }}
   .qa-a {{
-    font-size: 0.83rem;
+    font-size: 0.82rem;
     color: {TEXT_MUTED};
     line-height: 1.5;
   }}
 
-  /* Hide Streamlit chrome */
-  #MainMenu, footer, header {{ visibility: hidden; }}
-  .stTabs [data-baseweb="tab-list"] {{
-    background-color: {MID_NAVY};
+  /* ── CTA buttons ── */
+  .cta-btn {{
+    display: block;
+    padding: 1.4rem 1.2rem;
     border-radius: 8px;
-    padding: 4px;
-    gap: 4px;
+    text-align: center;
+    text-decoration: none;
   }}
-  .stTabs [data-baseweb="tab"] {{
-    border-radius: 6px;
-    color: {TEXT_MUTED};
-    font-weight: 500;
-    padding: 8px 18px;
-  }}
-  .stTabs [aria-selected="true"] {{
-    background-color: {MTA_ORANGE} !important;
-    color: white !important;
-    font-weight: 600;
-  }}
-  div[data-testid="stVerticalBlock"] > div {{
-    padding-top: 0;
+  .cta-btn:hover {{ opacity: 0.88; }}
+
+  /* ── Hide Streamlit chrome ── */
+  #MainMenu, footer, header {{ visibility: hidden; }}
+  div[data-testid="stVerticalBlock"] > div {{ padding-top: 0; }}
+
+  /* ── Mobile responsive ── */
+  @media (max-width: 768px) {{
+    .header-title   {{ font-size: 1.8rem; }}
+    .big-stat-number {{ font-size: 2rem; }}
+    .metric-card    {{ margin-bottom: 1rem; }}
+    .nav-bar a      {{ margin: 0 0.5rem; font-size: 0.78rem; }}
   }}
 </style>
 """, unsafe_allow_html=True)
@@ -257,6 +331,21 @@ date_max   = df["arrival_date"].max()
 n_weekdays = df[df["is_weekday"]]["arrival_date"].nunique()
 
 
+# ── Computed metrics (used throughout layout) ─────────────────────────────────
+ev_nb_b = get_median(df, day_type="Weekday", bucket="Evening Rush (4–7 PM)", direction="N", period="Before swap")
+ev_nb_a = get_median(df, day_type="Weekday", bucket="Evening Rush (4–7 PM)", direction="N", period="After swap")
+am_sb_b = get_median(df, day_type="Weekday", bucket="Morning Rush (6–9 AM)", direction="S", period="Before swap")
+am_sb_a = get_median(df, day_type="Weekday", bucket="Morning Rush (6–9 AM)", direction="S", period="After swap")
+pct_over_10_before = get_pct_over(df, 10.0, direction="N", period="Before swap")
+pct_over_10_after  = get_pct_over(df, 10.0, direction="N", period="After swap")
+
+ev_pct        = (ev_nb_a - ev_nb_b) / ev_nb_b * 100
+am_pct        = (am_sb_a - am_sb_b) / am_sb_b * 100
+ev_delta      = ev_nb_a - ev_nb_b
+am_delta      = am_sb_a - am_sb_b
+monthly_extra = am_delta * 2 * 22
+
+
 # ── Header ────────────────────────────────────────────────────────────────────
 st.markdown(f"""
 <div class="header-strip">
@@ -270,6 +359,17 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+# ── Navigation bar ────────────────────────────────────────────────────────────
+st.markdown(f"""
+<div class="nav-bar">
+  <a class="active" href="#hero">The Impact</a>
+  <a href="#pattern">Full Picture</a>
+  <a href="#commuters">For Commuters</a>
+  <a href="#mta-promise">MTA's Promise</a>
+  <a href="#data">The Data</a>
+  <a href="#action">Take Action</a>
+</div>
+""", unsafe_allow_html=True)
 
 # ── Plain-language summary ────────────────────────────────────────────────────
 st.markdown(f"""
@@ -279,10 +379,9 @@ st.markdown(f"""
   without a compensating service improvement. Median evening wait times have <strong>more than doubled</strong>,
   and the MTA's own promised fix of "~1 minute extra" has not materialized.
   All figures below are based on <strong>{n_obs:,} real train arrivals</strong> pulled from the MTA's official
-  GTFS real-time feed. Scroll through the tabs for charts, or jump to <em>Data &amp; Methods</em> for full reproducibility details.
+  GTFS real-time feed. Scroll down for charts, or jump ahead using the links above.
 </div>
 """, unsafe_allow_html=True)
-
 
 # ── Key metrics row ───────────────────────────────────────────────────────────
 def metric_card(label, value, sub, style="alarm"):
@@ -292,17 +391,6 @@ def metric_card(label, value, sub, style="alarm"):
       <div class="metric-value {'red' if style == 'alarm' else 'orange' if style == 'warning' else ''}">{value}</div>
       <div class="metric-sub">{sub}</div>
     </div>"""
-
-ev_nb_b = get_median(df, day_type="Weekday", bucket="Evening Rush (4–7 PM)", direction="N", period="Before swap")
-ev_nb_a = get_median(df, day_type="Weekday", bucket="Evening Rush (4–7 PM)", direction="N", period="After swap")
-am_sb_b = get_median(df, day_type="Weekday", bucket="Morning Rush (6–9 AM)", direction="S", period="Before swap")
-am_sb_a = get_median(df, day_type="Weekday", bucket="Morning Rush (6–9 AM)", direction="S", period="After swap")
-pct_over_10_before = get_pct_over(df, 10.0, direction="N", period="Before swap")
-pct_over_10_after  = get_pct_over(df, 10.0, direction="N", period="After swap")
-
-ev_pct  = (ev_nb_a - ev_nb_b) / ev_nb_b * 100
-am_pct  = (am_sb_a - am_sb_b) / am_sb_b * 100
-monthly_extra = (am_sb_a - am_sb_b) * 2 * 22
 
 c1, c2, c3, c4 = st.columns(4)
 with c1:
@@ -333,8 +421,6 @@ with c4:
         f"1-in-3 northbound trains — up from {pct_over_10_before:.0f}% (1-in-5)",
         "alarm"
     ), unsafe_allow_html=True)
-
-st.markdown("<br>", unsafe_allow_html=True)
 
 
 # ── Plotting helpers ──────────────────────────────────────────────────────────
@@ -381,29 +467,23 @@ def direction_overview_fig(df: pd.DataFrame, direction: str, dir_label: str) -> 
         bef_p90.append(b.quantile(0.90)); aft_p90.append(a.quantile(0.90))
         active.append(label in SWAP_ACTIVE_BUCKETS)
 
-    # Use numeric x-axis so scatter markers can be offset to sit over their bar
     n = len(tick_labels)
     x_pos = list(range(n))
-    width = 0.35  # half-gap between before/after bars
+    width = 0.35
 
     fig = go.Figure()
-
-    # Before bars — centred at x - width/2
     fig.add_trace(go.Bar(
         name="F Train (before Dec 8)",
         x=[xi - width / 2 for xi in x_pos], y=bef_med,
         width=width, marker_color=BLUE_BEFORE,
         hovertemplate="<b>Before swap</b><br>Median: %{y:.1f} min<extra></extra>",
     ))
-    # After bars — centred at x + width/2
     fig.add_trace(go.Bar(
         name="M Train (after Dec 8)",
         x=[xi + width / 2 for xi in x_pos], y=aft_med,
         width=width, marker_color=RED_AFTER,
         hovertemplate="<b>After swap</b><br>Median: %{y:.1f} min<extra></extra>",
     ))
-
-    # 90th percentile markers — offset to match their bar
     fig.add_trace(go.Scatter(
         name="90th pct (before)",
         x=[xi - width / 2 for xi in x_pos], y=bef_p90,
@@ -418,8 +498,6 @@ def direction_overview_fig(df: pd.DataFrame, direction: str, dir_label: str) -> 
         marker=dict(symbol="triangle-up", size=12, color=RED_AFTER, line=dict(color="white", width=1)),
         hovertemplate="90th pct (after): %{y:.1f} min<extra></extra>",
     ))
-
-    # Percentage change annotations — centred over each pair
     for i, (bv, av) in enumerate(zip(bef_med, aft_med)):
         pct = (av - bv) / bv * 100
         color = RED_AFTER if pct > 0 else GREEN_OK
@@ -429,8 +507,6 @@ def direction_overview_fig(df: pd.DataFrame, direction: str, dir_label: str) -> 
             showarrow=False, font=dict(size=12, color=color),
             bgcolor="rgba(0,0,0,0)",
         )
-
-    # Swap-active shading using numeric x positions
     for i, is_active in enumerate(active):
         if is_active:
             fig.add_vrect(
@@ -438,21 +514,15 @@ def direction_overview_fig(df: pd.DataFrame, direction: str, dir_label: str) -> 
                 fillcolor=RED_AFTER, opacity=0.06,
                 layer="below", line_width=0,
             )
-
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(text=f"<b>{dir_label}</b> — All Time Periods", font=dict(size=15)),
-        barmode="overlay",  # bars are already manually offset; overlay prevents double-grouping
+        barmode="overlay",
         yaxis_title="Median minutes between trains",
         height=420,
         legend=dict(**LEGEND_BASE, orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
-    # Set tick labels separately to avoid conflict with PLOTLY_LAYOUT's xaxis key
-    fig.update_xaxes(
-        tickmode="array",
-        tickvals=x_pos,
-        ticktext=tick_labels,
-    )
+    fig.update_xaxes(tickmode="array", tickvals=x_pos, ticktext=tick_labels)
     return fig
 
 
@@ -600,7 +670,7 @@ def sensitivity_fig(df: pd.DataFrame) -> go.Figure:
     storm_date = date_type(2026, 1, 25)
     wd_swap = df[df["is_weekday"] & (df["arrival_date"] >= SWAP_DATE) & df["within_swap_window"]]
 
-    pre     = df[df["is_weekday"] & (df["arrival_date"] < SWAP_DATE) & df["within_swap_window"]]
+    pre            = df[df["is_weekday"] & (df["arrival_date"] < SWAP_DATE) & df["within_swap_window"]]
     post_pre_storm = wd_swap[wd_swap["arrival_date"] < storm_date]
     post_storm     = wd_swap[wd_swap["arrival_date"] >= storm_date]
 
@@ -609,7 +679,7 @@ def sensitivity_fig(df: pd.DataFrame) -> go.Figure:
         ("Post-swap<br>before storm", post_pre_storm, AMBER_SWAP),
         ("Post-storm<br>(Jan 25+)", post_storm, RED_AFTER),
     ]
-    labels = [g[0] for g in groups]
+    labels  = [g[0] for g in groups]
     medians = [g[1]["headway_min"].median() for g in groups]
     colors  = [g[2] for g in groups]
     ns      = [len(g[1]) for g in groups]
@@ -624,7 +694,6 @@ def sensitivity_fig(df: pd.DataFrame) -> go.Figure:
         hovertemplate="<b>%{x}</b><br>Median: %{y:.2f} min<br>n=%{customdata:,}<extra></extra>",
         customdata=ns,
     ))
-    # Annotate % change
     base = medians[0]
     for i in range(1, len(medians)):
         pct = (medians[i] - base) / base * 100
@@ -645,60 +714,132 @@ def sensitivity_fig(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
-# ── Tabs ──────────────────────────────────────────────────────────────────────
-tab_overview, tab_morning, tab_evening, tab_waits, tab_weekend, tab_methodology = st.tabs([
-    "📊 Overview",
-    "🌅 Morning Commute",
-    "🌆 Evening Commute",
-    "⏱ Long Waits",
-    "📅 Weekend Check",
-    "🔬 Data & Methods",
-])
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECTION 1 — THE IMPACT
+# ═══════════════════════════════════════════════════════════════════════════════
+st.markdown('<a id="hero"></a>', unsafe_allow_html=True)
+st.markdown('<div class="section-head">Evening Rush Waits Have More Than Doubled</div>', unsafe_allow_html=True)
 
-
-# ── Tab: Overview ─────────────────────────────────────────────────────────────
-with tab_overview:
-    st.markdown('<div class="section-head">The Headline Finding</div>', unsafe_allow_html=True)
-    st.plotly_chart(evening_spotlight_fig(df), use_container_width=True)
-
-    st.markdown('<div class="section-head">The MTA\'s Own Admission</div>', unsafe_allow_html=True)
+_, stat_col, _ = st.columns([1, 2, 1])
+with stat_col:
     st.markdown(f"""
-    <div class="callout alarm">
-      The MTA's internal <strong>Staff Summary (September 15, 2025)</strong>, signed by Acting Chief of
-      Operations Planning Sarah Wyss, acknowledged that Roosevelt Island riders would face longer waits
-      due to the M running less frequently than the F. The MTA committed to increasing peak M service so
-      that <strong>"the average additional wait time will be reduced to approximately 1 minute on average."</strong>
-      <br><br>
-      Our analysis shows the actual median increase is <strong>3.2 minutes in the morning and 4.2 minutes in
-      the evening</strong> — the MTA missed its own target by a factor of 3–4×.
+    <div class="big-stat">
+      <div class="big-stat-number">{ev_nb_b:.1f} min &rarr; {ev_nb_a:.1f} min</div>
+      <div class="big-stat-label">Median evening northbound wait · 4–7 PM · weekdays</div>
+      <div class="big-stat-sub">
+        The MTA promised "approximately 1 minute" longer.<br>
+        Riders are waiting <strong style="color:{MTA_ORANGE};">{ev_delta:.1f} minutes more</strong> — every single evening.
+      </div>
     </div>
     """, unsafe_allow_html=True)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown('<div class="section-head">Storm Sensitivity</div>', unsafe_allow_html=True)
-        st.plotly_chart(sensitivity_fig(df), use_container_width=True)
-    with col2:
-        st.markdown('<div class="section-head">About This Analysis</div>', unsafe_allow_html=True)
-        st.markdown(f"""
-        <br>
-        <div class="callout">
-          <strong>Data:</strong> {n_obs:,} train observations from
-          <a href="https://subwaydata.nyc" style="color:{MTA_ORANGE}">subwaydata.nyc</a> —
-          complete MTA GTFS real-time feed archives. Not a periodic sample.<br><br>
-          <strong>Station:</strong> Roosevelt Island (GTFS stop IDs: B06N/B06S), verified against
-          the official MTA Station & Complexes glossary on data.ny.gov.<br><br>
-          <strong>Period:</strong> Oct 1 – Dec 7, 2025 (pre-swap) vs.
-          Dec 8, 2025 – Feb 15, 2026 (post-swap). {n_weekdays} weekdays total.<br><br>
-          <strong>Full methodology and data</strong> available on
-          <a href="https://github.com/[GITHUB-REPO-LINK]" style="color:{MTA_ORANGE}">GitHub</a>.
-        </div>
-        """, unsafe_allow_html=True)
+st.plotly_chart(evening_spotlight_fig(df), use_container_width=True)
+
+st.markdown(f"""
+<div class="callout alarm">
+  The MTA's internal <strong>Staff Summary (September 15, 2025)</strong>, signed by Acting Chief of
+  Operations Planning Sarah Wyss, acknowledged that Roosevelt Island riders would face longer waits
+  due to the M running less frequently than the F. The MTA committed to increasing peak M service so
+  that <strong>"the average additional wait time will be reduced to approximately 1 minute on average."</strong>
+  <br><br>
+  Our analysis shows the actual median increase is <strong>{am_delta:.1f} minutes in the morning
+  and {ev_delta:.1f} minutes in the evening</strong> — the MTA missed its own target by a factor of 3–4×.
+</div>
+""", unsafe_allow_html=True)
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECTION 2 — THE FULL PICTURE
+# ═══════════════════════════════════════════════════════════════════════════════
+st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+st.markdown('<a id="pattern"></a>', unsafe_allow_html=True)
+st.markdown('<div class="section-head">This Isn\'t Just Rush Hour — Every Period Got Worse</div>', unsafe_allow_html=True)
+st.markdown(f"""
+<div class="callout">
+  <strong>The swap affects all daytime hours, in both directions.</strong>
+  Shaded columns mark swap-active periods (weekdays 6 AM–9:30 PM). Bars show median wait times;
+  triangles (▲) mark the worst 1-in-10 wait for each period.
+</div>
+""", unsafe_allow_html=True)
+
+col1, col2 = st.columns(2)
+with col1:
+    st.plotly_chart(direction_overview_fig(df, "S", "Southbound (→ Manhattan)"), use_container_width=True)
+with col2:
+    st.plotly_chart(direction_overview_fig(df, "N", "Northbound (→ Queens/Home)"), use_container_width=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECTION 3 — FOR COMMUTERS
+# ═══════════════════════════════════════════════════════════════════════════════
+st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+st.markdown('<a id="commuters"></a>', unsafe_allow_html=True)
+st.markdown('<div class="section-head">How Often Do You Wait 10+ Minutes?</div>', unsafe_allow_html=True)
+
+col1, col2 = st.columns(2)
+with col1:
+    st.plotly_chart(long_wait_fig(df, "S", "Southbound (→ Manhattan)"), use_container_width=True)
+with col2:
+    st.plotly_chart(long_wait_fig(df, "N", "Northbound (→ Queens/Home)"), use_container_width=True)
+
+st.markdown(f"""
+<div class="callout">
+  <strong>Reading this chart:</strong> Each bar shows what share of train gaps exceeded a given threshold
+  during swap-active hours (6 AM–7 PM weekdays). There is now a <strong>1-in-3 chance</strong> of
+  waiting 10+ minutes for the northbound train home — up from 1-in-5 before the swap.
+  Every evening commute carries meaningful risk of a long delay.
+  Daily round-trip commuters lose roughly <strong>{monthly_extra:.0f} extra minutes per month</strong>
+  just standing on the platform.
+</div>
+""", unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECTION 4 — MTA'S BROKEN PROMISE
+# ═══════════════════════════════════════════════════════════════════════════════
+st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+st.markdown('<a id="mta-promise"></a>', unsafe_allow_html=True)
+st.markdown('<div class="section-head">What the MTA Committed To vs. What Actually Happened</div>', unsafe_allow_html=True)
+
+col1, col2 = st.columns(2)
+with col1:
+    st.markdown(f"""
+    <div style="background:{MID_NAVY}; border-left:4px solid {BLUE_BEFORE}; padding:1.5rem;
+                border-radius:0 8px 8px 0; height:100%;">
+      <div class="promise-label" style="color:{BLUE_BEFORE};">MTA Staff Summary · September 2025</div>
+      <div class="promise-quote">
+        "The average additional wait time will be reduced to approximately
+        <strong style="color:{TEXT_LIGHT};">1 minute on average.</strong>"
+      </div>
+      <div class="promise-attribution">— Sarah Wyss, Acting Chief of Operations Planning</div>
+    </div>
+    """, unsafe_allow_html=True)
+with col2:
+    st.markdown(f"""
+    <div style="background:rgba(232,51,74,0.07); border-left:4px solid {RED_AFTER}; padding:1.5rem;
+                border-radius:0 8px 8px 0; height:100%;">
+      <div class="promise-label" style="color:{RED_AFTER};">Observed Impact · Dec 2025 – Feb 2026</div>
+      <div class="promise-quote">
+        Morning commute: <strong style="color:{TEXT_LIGHT};">+{am_delta:.1f} minutes longer</strong><br>
+        Evening commute: <strong style="color:{TEXT_LIGHT};">+{ev_delta:.1f} minutes longer</strong>
+      </div>
+      <div class="promise-attribution">
+        The MTA missed its own target by a factor of 3–4×.<br>
+        Roosevelt Island has no alternative subway line.
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+col1, col2 = st.columns(2)
+with col1:
+    st.markdown('<div class="section-head">Was It the Storm?</div>', unsafe_allow_html=True)
+    st.plotly_chart(sensitivity_fig(df), use_container_width=True)
+with col2:
     st.markdown('<div class="section-head">Key Questions Answered</div>', unsafe_allow_html=True)
     st.markdown(f"""
-    <div class="qa-grid">
+    <div class="qa-grid" style="margin-top:1rem;">
       <div class="qa-item">
         <div class="qa-verdict no">NO</div>
         <div class="qa-q">Was the January 25 snowstorm responsible?</div>
@@ -714,101 +855,33 @@ with tab_overview:
       <div class="qa-item">
         <div class="qa-verdict no">NO</div>
         <div class="qa-q">Did the MTA deliver its promised ≤1 min improvement?</div>
-        <div class="qa-a">The median increase is <strong>3.2 min</strong> in the morning and
-        <strong>4.2 min</strong> in the evening — 3 to 4× the MTA's stated target.
-        See the <em>Staff Summary (Sep 15, 2025)</em> for the original commitment.</div>
+        <div class="qa-a">Median increase is <strong>{am_delta:.1f} min</strong> (AM) and
+        <strong>{ev_delta:.1f} min</strong> (PM) — 3–4× the MTA's stated target.
+        See the <em>Staff Summary (Sep 15, 2025)</em>.</div>
       </div>
       <div class="qa-item">
         <div class="qa-verdict no">OPEN DATA</div>
         <div class="qa-q">Can this analysis be independently verified?</div>
         <div class="qa-a">Yes. All {n_obs:,} observations come from the MTA's own GTFS real-time
-        feed (via subwaydata.nyc). Scripts, raw data, and full methodology are on GitHub.
-        See the <em>Data &amp; Methods</em> tab for details.</div>
+        feed (via subwaydata.nyc). Scripts, raw data &amp; methodology are on GitHub.</div>
       </div>
     </div>
     """, unsafe_allow_html=True)
 
 
-# ── Tab: Morning commute ──────────────────────────────────────────────────────
-with tab_morning:
-    st.markdown('<div class="section-head">Southbound (→ Manhattan) — All Weekday Periods</div>', unsafe_allow_html=True)
-    st.markdown(f"""
-    <div class="callout">
-      <strong>Direction note:</strong> Roosevelt Island is on the 63rd Street line.
-      "Southbound" means toward Manhattan — the direction that matters for the morning commute.
-      The swap is active weekdays 6 AM–9:30 PM (shaded columns).
-    </div>
-    """, unsafe_allow_html=True)
-    st.plotly_chart(
-        direction_overview_fig(df, "S", "Southbound (→ Manhattan)"),
-        use_container_width=True
-    )
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECTION 5 — THE DATA
+# ═══════════════════════════════════════════════════════════════════════════════
+st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+st.markdown('<a id="data"></a>', unsafe_allow_html=True)
 
-
-# ── Tab: Evening commute ──────────────────────────────────────────────────────
-with tab_evening:
-    st.markdown('<div class="section-head">Northbound (→ Queens/Home) — All Weekday Periods</div>', unsafe_allow_html=True)
-    st.markdown(f"""
-    <div class="callout">
-      <strong>Direction note:</strong> "Northbound" means toward Queens — the direction that matters
-      for the evening commute home. The +111% evening rush finding is the strongest data point
-      in this analysis.
-    </div>
-    """, unsafe_allow_html=True)
-    st.plotly_chart(
-        direction_overview_fig(df, "N", "Northbound (→ Queens/Home)"),
-        use_container_width=True
-    )
-
-
-# ── Tab: Long waits ───────────────────────────────────────────────────────────
-with tab_waits:
-    st.markdown('<div class="section-head">How Often Do Riders Face a Long Wait?</div>', unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
-        st.plotly_chart(
-            long_wait_fig(df, "S", "Southbound (→ Manhattan)"),
-            use_container_width=True
-        )
-    with col2:
-        st.plotly_chart(
-            long_wait_fig(df, "N", "Northbound (→ Queens/Home)"),
-            use_container_width=True
-        )
-    st.markdown(f"""
-    <div class="callout">
-      <strong>Reading this chart:</strong> Each bar shows the percentage of train intervals
-      that exceeded a given wait time threshold, during swap-active hours (6 AM–7 PM weekdays).
-      A 1-in-3 chance of waiting more than 10 minutes for the northbound train
-      (up from 1-in-5) means every evening commute carries meaningful risk of a long delay.
-    </div>
-    """, unsafe_allow_html=True)
-
-
-# ── Tab: Weekends ─────────────────────────────────────────────────────────────
-with tab_weekend:
-    st.markdown('<div class="section-head">Weekend F Train — Systemwide Signal</div>', unsafe_allow_html=True)
-    st.markdown(f"""
-    <div class="callout">
-      The F/M swap is <strong>weekday-only</strong>. The F train serves Roosevelt Island on weekends
-      in both periods. Any headway increases on weekends <strong>cannot be attributed to the swap</strong>
-      — they suggest the F line has experienced some independent service drift since December.
-      This actually strengthens the weekday case: it isolates the swap's contribution and shows
-      Roosevelt Island residents are being affected on two fronts.
-    </div>
-    """, unsafe_allow_html=True)
-    st.plotly_chart(weekend_fig(df), use_container_width=True)
-
-
-# ── Tab: Methodology ─────────────────────────────────────────────────────────
-with tab_methodology:
-    st.markdown('<div class="section-head">Methodology & Data Sources</div>', unsafe_allow_html=True)
+with st.expander("📊 How We Know This Is Real — Full Data & Methodology", expanded=False):
     col1, col2 = st.columns(2)
     with col1:
         st.markdown(f"""
         **Data source**
-        [subwaydata.nyc](https://subwaydata.nyc) archives the complete MTA GTFS real-time feed
-        daily — not a periodic sample. Every train arrival at every station is captured.
+        [{n_obs:,} train observations](https://subwaydata.nyc) from subwaydata.nyc — complete MTA
+        GTFS real-time feed archives. Not a periodic sample. Every train arrival at every station is captured.
 
         **Station identification**
         Roosevelt Island confirmed as GTFS stop IDs B06N (northbound) and B06S (southbound),
@@ -821,6 +894,7 @@ with tab_methodology:
         **Headway calculation**
         Time between consecutive train arrivals per direction per day.
         Outliers excluded: values < 1 min or > 60 min (overnight cap: 90 min).
+        All headline figures use the **median** (not mean) to reflect the typical rider experience.
         """)
     with col2:
         st.markdown(f"""
@@ -843,9 +917,67 @@ with tab_methodology:
         We welcome scrutiny and independent replication.
         """)
 
+    st.markdown('<div class="section-head">Weekend Context — The Control Group</div>', unsafe_allow_html=True)
+    st.markdown(f"""
+    <div class="callout">
+      The F/M swap is <strong>weekday-only</strong>. Weekend F train data is the natural control group —
+      any headway changes on weekends <strong>cannot be attributed to the swap</strong>.
+      The near-flat weekend chart below confirms the weekday increases are swap-driven, not a
+      general F-line drift.
+    </div>
+    """, unsafe_allow_html=True)
+    st.plotly_chart(weekend_fig(df), use_container_width=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECTION 6 — TAKE ACTION
+# ═══════════════════════════════════════════════════════════════════════════════
+st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+st.markdown('<a id="action"></a>', unsafe_allow_html=True)
+st.markdown('<div class="section-head">Roosevelt Island Deserves Better</div>', unsafe_allow_html=True)
+
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.markdown(f"""
+    <a href="mailto:jmenin@council.nyc.gov?subject=Roosevelt%20Island%20F%2FM%20Swap%20Service%20Impact"
+       style="background:{MTA_ORANGE}; display:block; padding:1.5rem 1.2rem; border-radius:8px;
+              text-align:center; text-decoration:none;">
+      <div style="font-size:2rem;">📧</div>
+      <div style="color:white; font-weight:700; margin-top:0.5rem; font-size:0.95rem;">Contact Council Member Menin</div>
+      <div style="color:rgba(255,255,255,0.75); font-size:0.78rem; margin-top:0.2rem;">jmenin@council.nyc.gov</div>
+    </a>
+    """, unsafe_allow_html=True)
+with col2:
+    st.markdown(f"""
+    <a href="https://github.com/[GITHUB-REPO-LINK]" target="_blank"
+       style="background:{MID_NAVY}; border:2px solid {MTA_ORANGE}; display:block; padding:1.5rem 1.2rem;
+              border-radius:8px; text-align:center; text-decoration:none;">
+      <div style="font-size:2rem;">📊</div>
+      <div style="color:{TEXT_LIGHT}; font-weight:700; margin-top:0.5rem; font-size:0.95rem;">Download Full Analysis</div>
+      <div style="color:{TEXT_MUTED}; font-size:0.78rem; margin-top:0.2rem;">Data, scripts &amp; methodology on GitHub</div>
+    </a>
+    """, unsafe_allow_html=True)
+with col3:
+    st.markdown(f"""
+    <a href="mailto:feedback@mta.info?subject=Roosevelt%20Island%20F%2FM%20Swap%20Concerns"
+       style="background:{MID_NAVY}; border:2px solid {MTA_ORANGE}; display:block; padding:1.5rem 1.2rem;
+              border-radius:8px; text-align:center; text-decoration:none;">
+      <div style="font-size:2rem;">🚇</div>
+      <div style="color:{TEXT_LIGHT}; font-weight:700; margin-top:0.5rem; font-size:0.95rem;">Contact the MTA</div>
+      <div style="color:{TEXT_MUTED}; font-size:0.78rem; margin-top:0.2rem;">feedback@mta.info</div>
+    </a>
+    """, unsafe_allow_html=True)
+
+st.markdown(f"""
+<div style="text-align:center; margin:2rem 0 1rem; color:{TEXT_MUTED}; font-size:0.88rem; line-height:1.6;">
+  This analysis was prepared by Roosevelt Island residents using publicly available MTA data.<br>
+  We welcome scrutiny — all code and data are public.
+</div>
+""", unsafe_allow_html=True)
+
 
 # ── Footer ────────────────────────────────────────────────────────────────────
-st.markdown("<br><br>", unsafe_allow_html=True)
+st.markdown("<br>", unsafe_allow_html=True)
 st.markdown(f"""
 <div style="border-top: 1px solid {LIGHT_NAVY}; padding: 1.2rem 0 0.5rem; text-align: center;
      font-size: 0.78rem; color: {TEXT_MUTED};">

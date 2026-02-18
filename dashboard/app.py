@@ -199,7 +199,7 @@ st.markdown(f"""
   <div class="header-title">The F/M Swap Is Hurting Roosevelt Island</div>
   <div class="header-subtitle">
     Since December 8, 2025, the MTA replaced the F train with the M on weekdays.
-    Evening rush wait times have more than doubled. This dashboard documents the impact
+    Median evening rush wait times have more than doubled. This dashboard documents the impact
     using {n_obs:,} train observations across {n_weekdays} weekdays.
   </div>
 </div>
@@ -231,21 +231,21 @@ with c1:
     st.markdown(metric_card(
         "Evening Commute Home ↑",
         f"+{ev_pct:.0f}%",
-        f"{ev_nb_b:.1f} → {ev_nb_a:.1f} min northbound (4–7 PM)",
+        f"Median: {ev_nb_b:.1f} → {ev_nb_a:.1f} min northbound (4–7 PM)",
         "alarm"
     ), unsafe_allow_html=True)
 with c2:
     st.markdown(metric_card(
         "Morning Commute to Manhattan ↑",
         f"+{am_pct:.0f}%",
-        f"{am_sb_b:.1f} → {am_sb_a:.1f} min southbound (6–9 AM)",
+        f"Median: {am_sb_b:.1f} → {am_sb_a:.1f} min southbound (6–9 AM)",
         "alarm"
     ), unsafe_allow_html=True)
 with c3:
     st.markdown(metric_card(
         "Extra Wait Time Per Month",
         f"{monthly_extra:.0f} min",
-        f"Based on daily round-trip, 22 working days",
+        f"Based on median increase × daily round-trip × 22 working days",
         "warning"
     ), unsafe_allow_html=True)
 with c4:
@@ -431,14 +431,14 @@ def evening_spotlight_fig(df: pd.DataFrame) -> go.Figure:
         marker_color=BLUE_BEFORE, offsetgroup=0,
         text=[f"{v:.1f} min" for v in bef],
         textposition="inside", textfont=dict(color="white", size=13, family="Barlow Condensed"),
-        hovertemplate="<b>%{x}</b><br>Before: %{y:.1f} min<extra></extra>",
+        hovertemplate="<b>%{x}</b><br>Median (before): %{y:.1f} min<extra></extra>",
     ))
     fig.add_trace(go.Bar(
         name="M Train (after Dec 8)", x=labels, y=aft,
         marker_color=RED_AFTER, offsetgroup=1,
         text=[f"{v:.1f} min" for v in aft],
         textposition="inside", textfont=dict(color="white", size=13, family="Barlow Condensed"),
-        hovertemplate="<b>%{x}</b><br>After: %{y:.1f} min<extra></extra>",
+        hovertemplate="<b>%{x}</b><br>Median (after): %{y:.1f} min<extra></extra>",
     ))
     for i, (bv, av) in enumerate(zip(bef, aft)):
         pct = (av - bv) / bv * 100
@@ -483,13 +483,13 @@ def weekend_fig(df: pd.DataFrame) -> go.Figure:
             name="F before Dec 8" if col_idx == 1 else None,
             x=labels, y=bef_med, marker_color=BLUE_BEFORE,
             offsetgroup=0, showlegend=(col_idx == 1),
-            hovertemplate="<b>%{x}</b><br>Before: %{y:.1f} min<extra></extra>",
+            hovertemplate="<b>%{x}</b><br>Median (before): %{y:.1f} min<extra></extra>",
         ), row=1, col=col_idx)
         fig.add_trace(go.Bar(
             name="F after Dec 8" if col_idx == 1 else None,
             x=labels, y=aft_med, marker_color=RED_AFTER,
             offsetgroup=1, showlegend=(col_idx == 1),
-            hovertemplate="<b>%{x}</b><br>After: %{y:.1f} min<extra></extra>",
+            hovertemplate="<b>%{x}</b><br>Median (after): %{y:.1f} min<extra></extra>",
         ), row=1, col=col_idx)
 
         for i, (bv, av) in enumerate(zip(bef_med, aft_med)):
@@ -591,7 +591,7 @@ with tab_overview:
       due to the M running less frequently than the F. The MTA committed to increasing peak M service so
       that <strong>"the average additional wait time will be reduced to approximately 1 minute on average."</strong>
       <br><br>
-      Our analysis shows the actual increase is <strong>3.2 minutes in the morning and 4.2 minutes in
+      Our analysis shows the actual median increase is <strong>3.2 minutes in the morning and 4.2 minutes in
       the evening</strong> — the MTA missed its own target by a factor of 3–4×.
     </div>
     """, unsafe_allow_html=True)

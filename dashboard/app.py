@@ -653,15 +653,16 @@ def weekend_fig(df: pd.DataFrame) -> go.Figure:
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(
-            text="<b>Weekend Headways — F Train Both Periods</b><br><sup>Swap is weekday-only. Changes here suggest systemwide F service shifts independent of the swap.</sup>",
+            text="<b>Weekend Headways — F Train Both Periods</b><br><sup>Swap is weekday-only. Weekend increases reflect general F-line shifts; weekday increases go far beyond this baseline.</sup>",
             font=dict(size=14),
         ),
         barmode="group",
         height=440,
         legend=dict(**LEGEND_BASE, orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1),
     )
-    fig.update_xaxes(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY)
+    fig.update_xaxes(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, tickangle=-30, tickfont=dict(size=10))
     fig.update_yaxes(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, title_text="Median minutes between trains", col=1)
+    fig.update_layout(margin=dict(l=10, r=10, t=70, b=60))
     return fig
 
 
@@ -737,7 +738,8 @@ st.plotly_chart(evening_spotlight_fig(df), use_container_width=True)
 
 st.markdown(f"""
 <div class="callout alarm">
-  The MTA's internal <strong>Staff Summary (September 15, 2025)</strong>, signed by Acting Chief of
+  The MTA's internal <strong><a href="https://www.mta.info/document/186641" target="_blank"
+  style="color:inherit;">Staff Summary (September 15, 2025)</a></strong>, signed by Acting Chief of
   Operations Planning Sarah Wyss, acknowledged that Roosevelt Island riders would face longer waits
   due to the M running less frequently than the F. The MTA committed to increasing peak M service so
   that <strong>"the average additional wait time will be reduced to approximately 1 minute on average."</strong>
@@ -806,7 +808,7 @@ with col1:
     st.markdown(f"""
     <div style="background:{MID_NAVY}; border-left:4px solid {BLUE_BEFORE}; padding:1.5rem;
                 border-radius:0 8px 8px 0; height:100%;">
-      <div class="promise-label" style="color:{BLUE_BEFORE};">MTA Staff Summary · September 2025</div>
+      <div class="promise-label" style="color:{BLUE_BEFORE};"><a href="https://www.mta.info/document/186641" target="_blank" style="color:inherit; text-decoration:underline;">MTA Staff Summary · September 2025</a></div>
       <div class="promise-quote">
         "The average additional wait time will be reduced to approximately
         <strong style="color:{TEXT_LIGHT};">1 minute on average.</strong>"
@@ -837,31 +839,34 @@ with col1:
     st.markdown('<div class="section-head">Was It the Storm?</div>', unsafe_allow_html=True)
     st.plotly_chart(sensitivity_fig(df), use_container_width=True)
 with col2:
-    st.markdown('<div class="section-head">Key Questions Answered</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-head">FAQs</div>', unsafe_allow_html=True)
     st.markdown(f"""
     <div class="qa-grid" style="margin-top:1rem;">
       <div class="qa-item">
-        <div class="qa-verdict no">NO</div>
         <div class="qa-q">Was the January 25 snowstorm responsible?</div>
+        <div class="qa-verdict no">No</div>
         <div class="qa-a">Wait times were already up <strong>54%</strong> before the storm hit.
         Including the storm period raises that figure to ~60%. The weather did not cause this.</div>
       </div>
       <div class="qa-item">
-        <div class="qa-verdict no">NO</div>
         <div class="qa-q">Is this a general F-line problem, not the swap?</div>
-        <div class="qa-a">Weekends show no comparable increase — and the swap is weekday-only.
-        Weekend F service is the control group. The swap is the cause.</div>
+        <div class="qa-verdict no">Not primarily</div>
+        <div class="qa-a">Weekends are the control group — and even they show some headway increases,
+        reflecting modest F-line drift. But weekday increases are <strong>far larger</strong>, because
+        Roosevelt Island residents face that baseline drift <em>plus</em> the M swap.
+        The swap is clearly the dominant cause.</div>
       </div>
       <div class="qa-item">
-        <div class="qa-verdict no">NO</div>
         <div class="qa-q">Did the MTA deliver its promised ≤1 min improvement?</div>
+        <div class="qa-verdict no">No</div>
         <div class="qa-a">Median increase is <strong>{am_delta:.1f} min</strong> (AM) and
         <strong>{ev_delta:.1f} min</strong> (PM) — 3–4× the MTA's stated target.
-        See the <em>Staff Summary (Sep 15, 2025)</em>.</div>
+        See the <a href="https://www.mta.info/document/186641" target="_blank"
+        style="color:{TEXT_MUTED};">Staff Summary (Sep 15, 2025)</a>.</div>
       </div>
       <div class="qa-item">
-        <div class="qa-verdict no">OPEN DATA</div>
         <div class="qa-q">Can this analysis be independently verified?</div>
+        <div class="qa-verdict no">Open data</div>
         <div class="qa-a">Yes. All {n_obs:,} observations come from the MTA's own GTFS real-time
         feed (via subwaydata.nyc). Scripts, raw data &amp; methodology are on GitHub.</div>
       </div>
@@ -913,7 +918,7 @@ with st.expander("📊 How We Know This Is Real — Full Data & Methodology", ex
 
         **Reproducibility**
         Complete data, scripts, and methodology are publicly available at
-        [github.com/[GITHUB-REPO-LINK]](https://github.com/[GITHUB-REPO-LINK]).
+        [github.com/jhk9721/mta-mf-swap](https://github.com/jhk9721/mta-mf-swap).
         We welcome scrutiny and independent replication.
         """)
 
@@ -922,8 +927,10 @@ with st.expander("📊 How We Know This Is Real — Full Data & Methodology", ex
     <div class="callout">
       The F/M swap is <strong>weekday-only</strong>. Weekend F train data is the natural control group —
       any headway changes on weekends <strong>cannot be attributed to the swap</strong>.
-      The near-flat weekend chart below confirms the weekday increases are swap-driven, not a
-      general F-line drift.
+      Notably, even weekends show some headway increases, suggesting the overall F line has seen modest
+      service degradation. <strong>This makes the weekday situation worse, not better:</strong>
+      Roosevelt Island residents face both a general F-line decline <em>and</em> the additional burden
+      of the M swap on weekdays. The gap between weekday and weekend increases isolates the swap's impact.
     </div>
     """, unsafe_allow_html=True)
     st.plotly_chart(weekend_fig(df), use_container_width=True)
@@ -949,7 +956,7 @@ with col1:
     """, unsafe_allow_html=True)
 with col2:
     st.markdown(f"""
-    <a href="https://github.com/[GITHUB-REPO-LINK]" target="_blank"
+    <a href="https://github.com/jhk9721/mta-mf-swap" target="_blank"
        style="background:{MID_NAVY}; border:2px solid {MTA_ORANGE}; display:block; padding:1.5rem 1.2rem;
               border-radius:8px; text-align:center; text-decoration:none;">
       <div style="font-size:2rem;">📊</div>
@@ -983,6 +990,6 @@ st.markdown(f"""
      font-size: 0.78rem; color: {TEXT_MUTED};">
   Prepared by Roosevelt Island Residents for Better Transit ·
   Data: subwaydata.nyc · {n_obs:,} observations · {date_min} – {date_max} ·
-  <a href="https://github.com/[GITHUB-REPO-LINK]" style="color:{MTA_ORANGE};">View on GitHub</a>
+  <a href="https://github.com/jhk9721/mta-mf-swap" style="color:{MTA_ORANGE};">View on GitHub</a>
 </div>
 """, unsafe_allow_html=True)

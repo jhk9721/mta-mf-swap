@@ -29,14 +29,15 @@ st.set_page_config(
 )
 
 # ── Theme constants ───────────────────────────────────────────────────────────
-MTA_ORANGE  = "#FF6319"
+MTA_ORANGE  = "#FF6319"   # accent / brand (borders, links, tabs)
 DARK_NAVY   = "#0D1B2A"
 MID_NAVY    = "#1B2E44"
 LIGHT_NAVY  = "#243B55"
-BLUE_BEFORE = "#4C8BE0"
-RED_AFTER   = "#E05C4C"
+BLUE_BEFORE = "#3A9BFF"   # F-train "before" — vivid, unambiguously blue
+RED_AFTER   = "#E8334A"   # M-train "after" — clearly red, visually apart from MTA_ORANGE
+AMBER_SWAP  = "#F4A261"   # neutral comparison bar (sensitivity chart middle)
 TEXT_LIGHT  = "#F0F4F8"
-TEXT_MUTED  = "#8CA0B3"
+TEXT_MUTED  = "#9DB4C8"   # bumped slightly lighter for WCAG readability
 GREEN_OK    = "#2ECC71"
 
 BUCKET_ORDER = [
@@ -84,9 +85,11 @@ st.markdown(f"""
   }}
   .header-subtitle {{
     font-size: 1rem;
-    color: {TEXT_MUTED};
+    color: {TEXT_LIGHT};
+    opacity: 0.85;
     margin-top: 0.5rem;
-    max-width: 680px;
+    max-width: 720px;
+    line-height: 1.55;
   }}
 
   /* Metric cards */
@@ -149,9 +152,71 @@ st.markdown(f"""
     padding: 1rem 1.4rem;
     margin: 1rem 0;
     font-size: 0.9rem;
-    color: {TEXT_MUTED};
+    color: {TEXT_LIGHT};
+    opacity: 0.9;
+    line-height: 1.6;
   }}
-  .callout strong {{ color: {TEXT_LIGHT}; }}
+  .callout strong {{ color: {TEXT_LIGHT}; opacity: 1; }}
+  .callout.alarm {{
+    border-left-color: {RED_AFTER};
+    background: rgba(232, 51, 74, 0.07);
+  }}
+
+  /* Plain-English summary banner */
+  .plain-summary {{
+    background: linear-gradient(135deg, #112035 0%, {MID_NAVY} 100%);
+    border: 1px solid {BLUE_BEFORE};
+    border-left: 5px solid {BLUE_BEFORE};
+    border-radius: 0 10px 10px 0;
+    padding: 1.1rem 1.6rem;
+    margin: 0 0 1.5rem 0;
+    font-size: 1rem;
+    color: {TEXT_LIGHT};
+    line-height: 1.65;
+  }}
+  .plain-summary .ps-label {{
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: {BLUE_BEFORE};
+    margin-bottom: 0.4rem;
+  }}
+
+  /* Key-questions grid */
+  .qa-grid {{
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.9rem;
+    margin: 0.5rem 0 1.5rem 0;
+  }}
+  .qa-item {{
+    background: {MID_NAVY};
+    border: 1px solid {LIGHT_NAVY};
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+  }}
+  .qa-verdict {{
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.3rem;
+  }}
+  .qa-verdict.no  {{ color: {GREEN_OK}; }}
+  .qa-verdict.yes {{ color: {RED_AFTER}; }}
+  .qa-q {{
+    font-weight: 600;
+    color: {TEXT_LIGHT};
+    font-size: 0.88rem;
+    margin-bottom: 0.35rem;
+  }}
+  .qa-a {{
+    font-size: 0.83rem;
+    color: {TEXT_MUTED};
+    line-height: 1.5;
+  }}
 
   /* Hide Streamlit chrome */
   #MainMenu, footer, header {{ visibility: hidden; }}
@@ -206,6 +271,19 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 
+# ── Plain-language summary ────────────────────────────────────────────────────
+st.markdown(f"""
+<div class="plain-summary">
+  <div class="ps-label">The short version</div>
+  On December 8, 2025, the MTA replaced the F train with the less-frequent M train on Roosevelt Island —
+  without a compensating service improvement. Median evening wait times have <strong>more than doubled</strong>,
+  and the MTA's own promised fix of "~1 minute extra" has not materialized.
+  All figures below are based on <strong>{n_obs:,} real train arrivals</strong> pulled from the MTA's official
+  GTFS real-time feed. Scroll through the tabs for charts, or jump to <em>Data &amp; Methods</em> for full reproducibility details.
+</div>
+""", unsafe_allow_html=True)
+
+
 # ── Key metrics row ───────────────────────────────────────────────────────────
 def metric_card(label, value, sub, style="alarm"):
     return f"""
@@ -250,9 +328,9 @@ with c3:
     ), unsafe_allow_html=True)
 with c4:
     st.markdown(metric_card(
-        "Waits > 10 Min (Evening, NB)",
+        "Evening Waits Over 10 Minutes",
         f"{pct_over_10_after:.0f}%",
-        f"Up from {pct_over_10_before:.0f}% — nearly doubled",
+        f"1-in-3 northbound trains — up from {pct_over_10_before:.0f}% (1-in-5)",
         "alarm"
     ), unsafe_allow_html=True)
 
@@ -528,7 +606,7 @@ def sensitivity_fig(df: pd.DataFrame) -> go.Figure:
 
     groups = [
         ("Pre-swap<br>(F train)", pre, BLUE_BEFORE),
-        ("Post-swap<br>before storm", post_pre_storm, MTA_ORANGE),
+        ("Post-swap<br>before storm", post_pre_storm, AMBER_SWAP),
         ("Post-storm<br>(Jan 25+)", post_storm, RED_AFTER),
     ]
     labels = [g[0] for g in groups]
@@ -573,8 +651,8 @@ tab_overview, tab_morning, tab_evening, tab_waits, tab_weekend, tab_methodology 
     "🌅 Morning Commute",
     "🌆 Evening Commute",
     "⏱ Long Waits",
-    "📅 Weekends",
-    "🔬 Methodology",
+    "📅 Weekend Check",
+    "🔬 Data & Methods",
 ])
 
 
@@ -585,7 +663,7 @@ with tab_overview:
 
     st.markdown('<div class="section-head">The MTA\'s Own Admission</div>', unsafe_allow_html=True)
     st.markdown(f"""
-    <div class="callout">
+    <div class="callout alarm">
       The MTA's internal <strong>Staff Summary (September 15, 2025)</strong>, signed by Acting Chief of
       Operations Planning Sarah Wyss, acknowledged that Roosevelt Island riders would face longer waits
       due to the M running less frequently than the F. The MTA committed to increasing peak M service so
@@ -616,6 +694,39 @@ with tab_overview:
           <a href="https://github.com/[GITHUB-REPO-LINK]" style="color:{MTA_ORANGE}">GitHub</a>.
         </div>
         """, unsafe_allow_html=True)
+
+
+    st.markdown('<div class="section-head">Key Questions Answered</div>', unsafe_allow_html=True)
+    st.markdown(f"""
+    <div class="qa-grid">
+      <div class="qa-item">
+        <div class="qa-verdict no">NO</div>
+        <div class="qa-q">Was the January 25 snowstorm responsible?</div>
+        <div class="qa-a">Wait times were already up <strong>54%</strong> before the storm hit.
+        Including the storm period raises that figure to ~60%. The weather did not cause this.</div>
+      </div>
+      <div class="qa-item">
+        <div class="qa-verdict no">NO</div>
+        <div class="qa-q">Is this a general F-line problem, not the swap?</div>
+        <div class="qa-a">Weekends show no comparable increase — and the swap is weekday-only.
+        Weekend F service is the control group. The swap is the cause.</div>
+      </div>
+      <div class="qa-item">
+        <div class="qa-verdict no">NO</div>
+        <div class="qa-q">Did the MTA deliver its promised ≤1 min improvement?</div>
+        <div class="qa-a">The median increase is <strong>3.2 min</strong> in the morning and
+        <strong>4.2 min</strong> in the evening — 3 to 4× the MTA's stated target.
+        See the <em>Staff Summary (Sep 15, 2025)</em> for the original commitment.</div>
+      </div>
+      <div class="qa-item">
+        <div class="qa-verdict no">OPEN DATA</div>
+        <div class="qa-q">Can this analysis be independently verified?</div>
+        <div class="qa-a">Yes. All {n_obs:,} observations come from the MTA's own GTFS real-time
+        feed (via subwaydata.nyc). Scripts, raw data, and full methodology are on GitHub.
+        See the <em>Data &amp; Methods</em> tab for details.</div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 # ── Tab: Morning commute ──────────────────────────────────────────────────────

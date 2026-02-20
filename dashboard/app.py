@@ -1085,74 +1085,76 @@ st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 st.markdown('<a id="action"></a>', unsafe_allow_html=True)
 st.markdown('<div class="section-head">Roosevelt Island Deserves Better</div>', unsafe_allow_html=True)
 
-st.markdown(f"""
-<div class="cta-row" style="display:flex; gap:1rem; margin-top:1.5rem;">
-
-  <a href="mailto:jmenin@council.nyc.gov?subject=Roosevelt%20Island%20F%2FM%20Swap%20Service%20Impact"
-     onclick="
-       if (typeof gtag !== 'undefined') {{
-         gtag('event', 'cta_click', {{'button': 'contact_menin'}});
-       }}
-       if (typeof plausible !== 'undefined') {{
-         plausible('CTA Click', {{props: {{button: 'contact_menin'}}}});
-       }}
-       return true;
-     "
-     style="flex:1; background:{MTA_ORANGE}; padding:1.5rem 1.2rem; border-radius:8px;
-            text-align:center; text-decoration:none;">
-    <div style="font-size:2rem;">📧</div>
-    <div style="color:white; font-weight:700; margin-top:0.5rem; font-size:0.95rem;">Contact Council Member Menin</div>
-    <div style="color:rgba(255,255,255,0.75); font-size:0.78rem; margin-top:0.2rem;">jmenin@council.nyc.gov</div>
-  </a>
-
-  <a href="https://github.com/jhk9721/mta-mf-swap" target="_blank"
-     onclick="
-       if (typeof gtag !== 'undefined') {{
-         gtag('event', 'cta_click', {{'button': 'github_download'}});
-       }}
-       if (typeof plausible !== 'undefined') {{
-         plausible('CTA Click', {{props: {{button: 'github_download'}}}});
-       }}
-       return true;
-     "
-     style="flex:1; background:{MID_NAVY}; border:2px solid {MTA_ORANGE}; padding:1.5rem 1.2rem;
-            border-radius:8px; text-align:center; text-decoration:none;">
-    <div style="font-size:2rem;">📊</div>
-    <div style="color:{TEXT_LIGHT}; font-weight:700; margin-top:0.5rem; font-size:0.95rem;">Download Full Analysis</div>
-    <div style="color:{TEXT_MUTED}; font-size:0.78rem; margin-top:0.2rem;">Data, scripts &amp; methodology on GitHub</div>
-  </a>
-
-  <div id="share-btn" style="flex:1; background:{MID_NAVY}; border:2px solid {MTA_ORANGE};
-              padding:1.5rem 1.2rem; border-radius:8px; text-align:center; cursor:pointer;"
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.markdown(f"""
+    <a href="mailto:jmenin@council.nyc.gov?subject=Roosevelt%20Island%20F%2FM%20Swap%20Service%20Impact"
        onclick="
-         navigator.clipboard.writeText(window.location.href).then(function() {{
-           if (typeof gtag !== 'undefined') {{
-             gtag('event', 'cta_click', {{'button': 'share_link'}});
-           }}
-           if (typeof plausible !== 'undefined') {{
-             plausible('CTA Click', {{props: {{button: 'share_link'}}}});
-           }}
-           var btn = document.getElementById('share-btn');
-           var label = btn.querySelector('.share-label');
-           label.textContent = '✓ Link Copied!';
-           btn.style.background = '{GREEN_OK}';
-           btn.style.borderColor = '{GREEN_OK}';
-           setTimeout(function() {{
-             label.textContent = 'Share This Analysis';
-             btn.style.background = '{MID_NAVY}';
-             btn.style.borderColor = '{MTA_ORANGE}';
-           }}, 2000);
-         }}).catch(function(err) {{
-           alert('Could not copy — please copy manually: ' + window.location.href);
-         }});
-       ">
-    <div style="font-size:2rem;">🔗</div>
-    <div class="share-label" style="color:{TEXT_LIGHT}; font-weight:700; margin-top:0.5rem; font-size:0.95rem;">Share This Analysis</div>
-    <div style="color:{TEXT_MUTED}; font-size:0.78rem; margin-top:0.2rem;">Copy link to clipboard</div>
-  </div>
-
-</div>
-""", unsafe_allow_html=True)
+         if (typeof gtag !== 'undefined') {{
+           gtag('event', 'cta_click', {{'button': 'contact_menin'}});
+         }}
+         if (typeof plausible !== 'undefined') {{
+           plausible('CTA Click', {{props: {{button: 'contact_menin'}}}});
+         }}
+         return true;
+       "
+       style="background:{MTA_ORANGE}; display:block; padding:1.5rem 1.2rem; border-radius:8px;
+              text-align:center; text-decoration:none;">
+      <div style="font-size:2rem;">📧</div>
+      <div style="color:white; font-weight:700; margin-top:0.5rem; font-size:0.95rem;">Contact Council Member Menin</div>
+      <div style="color:rgba(255,255,255,0.75); font-size:0.78rem; margin-top:0.2rem;">jmenin@council.nyc.gov</div>
+    </a>
+    """, unsafe_allow_html=True)
+with col2:
+    st.markdown(f"""
+    <a href="https://github.com/jhk9721/mta-mf-swap" target="_blank"
+       onclick="
+         if (typeof gtag !== 'undefined') {{
+           gtag('event', 'cta_click', {{'button': 'github_download'}});
+         }}
+         if (typeof plausible !== 'undefined') {{
+           plausible('CTA Click', {{props: {{button: 'github_download'}}}});
+         }}
+         return true;
+       "
+       style="background:{MID_NAVY}; border:2px solid {MTA_ORANGE}; display:block; padding:1.5rem 1.2rem;
+              border-radius:8px; text-align:center; text-decoration:none;">
+      <div style="font-size:2rem;">📊</div>
+      <div style="color:{TEXT_LIGHT}; font-weight:700; margin-top:0.5rem; font-size:0.95rem;">Download Full Analysis</div>
+      <div style="color:{TEXT_MUTED}; font-size:0.78rem; margin-top:0.2rem;">Data, scripts &amp; methodology on GitHub</div>
+    </a>
+    """, unsafe_allow_html=True)
+with col3:
+    st.markdown(f"""
+    <div id="share-btn" style="background:{MID_NAVY}; border:2px solid {MTA_ORANGE}; display:block;
+                padding:1.5rem 1.2rem; border-radius:8px; text-align:center; cursor:pointer;"
+         onclick="
+           navigator.clipboard.writeText(window.location.href).then(function() {{
+             if (typeof gtag !== 'undefined') {{
+               gtag('event', 'cta_click', {{'button': 'share_link'}});
+             }}
+             if (typeof plausible !== 'undefined') {{
+               plausible('CTA Click', {{props: {{button: 'share_link'}}}});
+             }}
+             var btn = document.getElementById('share-btn');
+             var label = btn.querySelector('.share-label');
+             label.textContent = '✓ Link Copied!';
+             btn.style.background = '{GREEN_OK}';
+             btn.style.borderColor = '{GREEN_OK}';
+             setTimeout(function() {{
+               label.textContent = 'Share This Analysis';
+               btn.style.background = '{MID_NAVY}';
+               btn.style.borderColor = '{MTA_ORANGE}';
+             }}, 2000);
+           }}).catch(function(err) {{
+             alert('Could not copy — please copy manually: ' + window.location.href);
+           }});
+         ">
+      <div style="font-size:2rem;">🔗</div>
+      <div class="share-label" style="color:{TEXT_LIGHT}; font-weight:700; margin-top:0.5rem; font-size:0.95rem;">Share This Analysis</div>
+      <div style="color:{TEXT_MUTED}; font-size:0.78rem; margin-top:0.2rem;">Copy link to clipboard</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 st.markdown(f"""
 <div style="text-align:center; margin:2rem 0 1rem; color:{TEXT_MUTED}; font-size:0.88rem; line-height:1.6;">

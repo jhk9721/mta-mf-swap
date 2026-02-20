@@ -54,17 +54,21 @@ def get_all_dates(year, month):
     return dates
 
 
-def download_file(d: date, output_dir: str) -> bool:
+def download_file(d: date, output_dir: str) -> str:
     """
     Download the CSV tar.xz for a single date.
-    Returns True on success, False on failure.
+    Returns:
+      "ok"      — newly downloaded
+      "skipped" — file already existed on disk
+      "missing" — server returned 404 (date not yet available)
+      "failed"  — network error or unexpected HTTP status
     """
     filename = f"subwaydatanyc_{d.strftime('%Y-%m-%d')}_csv.tar.xz"
     output_path = os.path.join(output_dir, filename)
 
     if os.path.exists(output_path):
         print(f"  [SKIP] {filename} already exists.")
-        return True
+        return "skipped"
 
     url = f"{BASE_URL}/{filename}"
     try:
@@ -74,16 +78,16 @@ def download_file(d: date, output_dir: str) -> bool:
                 f.write(response.content)
             size_kb = len(response.content) / 1024
             print(f"  [OK]   {filename}  ({size_kb:.0f} KB)")
-            return True
+            return "ok"
         elif response.status_code == 404:
             print(f"  [MISS] {filename} not found (404) — skipping.")
-            return False
+            return "missing"
         else:
             print(f"  [ERR]  {filename} HTTP {response.status_code}")
-            return False
+            return "failed"
     except requests.RequestException as e:
         print(f"  [ERR]  {filename} failed: {e}")
-        return False
+        return "failed"
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -92,22 +96,44 @@ def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     print(f"Saving files to: {os.path.abspath(OUTPUT_DIR)}\n")
 
-    success, skipped, failed = 0, 0, 0
+    downloaded, skipped, missing, failed = 0, 0, 0, 0
+    total_dates = 0
 
     for year, month in MONTHS:
         dates = get_all_dates(year, month)
+        total_dates += len(dates)
         print(f"── {year}-{month:02d}  ({len(dates)} days) ──────────────────")
         for d in dates:
             result = download_file(d, OUTPUT_DIR)
-            if result:
-                success += 1
+            if result == "ok":
+                downloaded += 1
+            elif result == "skipped":
+                skipped += 1
+            elif result == "missing":
+                missing += 1
             else:
                 failed += 1
             # Brief pause to be polite to the server
             time.sleep(0.5)
 
-    print(f"\nDone. {success} downloaded/skipped, {failed} failed.")
-    print(f"Files are in: {os.path.abspath(OUTPUT_DIR)}")
+    available = downloaded + skipped
+    coverage  = 100 * available / total_dates if total_dates > 0 else 0
+
+    print(f"\n── Download Summary ──────────────────────────────────────────")
+    print(f"  Total dates expected : {total_dates}")
+    print(f"  Downloaded (new)     : {downloaded}")
+    print(f"  Already on disk      : {skipped}")
+    print(f"  Not yet available    : {missing}")
+    print(f"  Errors               : {failed}")
+    print(f"  Coverage             : {available}/{total_dates} days ({coverage:.0f}%)")
+    print(f"  Files are in         : {os.path.abspath(OUTPUT_DIR)}")
+
+    if failed > 0:
+        print(f"\n  [WARN] {failed} file(s) failed to download. "
+              "Re-run this script to retry.")
+    if coverage < 80:
+        print(f"\n  [WARN] Low coverage ({coverage:.0f}%). "
+              "Analysis results may be incomplete.")
 
 
 if __name__ == "__main__":

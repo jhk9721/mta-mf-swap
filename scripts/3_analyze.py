@@ -33,6 +33,7 @@ OUTPUTS (saved to results/ folder):
 """
 
 import os
+import sys
 import tarfile
 import glob
 import pandas as pd
@@ -54,7 +55,14 @@ RESULTS_DIR  = "results"
 # Roosevelt Island — confirmed from MTA official GTFS station glossary
 ROOSEVELT_ISLAND_STOP_IDS = {"B06N", "B06S"}
 
-SWAP_DATE = date(2025, 12, 8)
+SWAP_DATE  = date(2025, 12, 8)
+STORM_DATE = date(2026, 1, 25)   # January blizzard — major service disruption
+
+# Holiday periods: weeks where reduced ridership may affect headway patterns
+HOLIDAY_PERIODS = [
+    (date(2025, 12, 22), date(2026, 1, 5)),   # Christmas / New Year
+    (date(2026, 1, 19), date(2026, 1, 19)),    # MLK Day
+]
 
 # ── Time bucket definitions ───────────────────────────────────────────────────
 # (start_hour_inclusive, end_hour_exclusive, weekday_label, weekend_label)
@@ -78,6 +86,14 @@ SWAP_AFFECTED_BUCKETS_NOTE = (
     "* F/M swap active weekdays 6 AM–9:30 PM: fully affects Morning Rush, Midday, and Evening Rush. "
     "Night bucket (7 PM–midnight) is partially affected on weekdays (7–9:30 PM within swap window)."
 )
+
+def is_holiday_week(d: date) -> bool:
+    """Return True if the date falls within a known holiday period."""
+    for start, end in HOLIDAY_PERIODS:
+        if start <= d <= end:
+            return True
+    return False
+
 
 def assign_time_bucket(hour: int, is_weekday: bool) -> str:
     for start, end, wd_label, we_label in TIME_BUCKETS:
@@ -165,9 +181,10 @@ def add_analysis_columns(df: pd.DataFrame) -> pd.DataFrame:
         lambda d: "After swap" if d >= SWAP_DATE else "Before swap"
     )
     df["day_type"]     = df["is_weekday"].map({True: "Weekday", False: "Weekend"})
-    df["time_bucket"]  = df.apply(
+    df["time_bucket"]    = df.apply(
         lambda r: assign_time_bucket(r["hour"], r["is_weekday"]), axis=1
     )
+    df["is_holiday_week"] = df["arrival_date"].apply(is_holiday_week)
     return df
 
 
@@ -184,14 +201,27 @@ def compute_headways(df: pd.DataFrame) -> pd.DataFrame:
         (df_s["arrival_dt"] - df_s["prev_arrival"]).dt.total_seconds() / 60
     )
     df_s = df_s.dropna(subset=["headway_min"])
-    # Overnight allows longer gaps; daytime cap at 60 min
-    df_s = df_s[df_s["headway_min"] >= 1]
+    total_before_filter = len(df_s)
+
+    # Overnight allows longer gaps (≤90 min); daytime cap at 60 min
+    below_min  = (df_s["headway_min"] < 1).sum()
+    df_s       = df_s[df_s["headway_min"] >= 1]
+
     early_am_mask = df_s["time_bucket"].str.startswith("1:")
+    above_max     = (
+        (early_am_mask  & (df_s["headway_min"] > 90)) |
+        (~early_am_mask & (df_s["headway_min"] > 60))
+    ).sum()
     df_s = df_s[
         (early_am_mask  & (df_s["headway_min"] <= 90)) |
         (~early_am_mask & (df_s["headway_min"] <= 60))
     ]
-    print(f"  {len(df_s):,} headway observations.\n")
+
+    total_removed = below_min + above_max
+    pct_removed   = 100 * total_removed / total_before_filter if total_before_filter > 0 else 0
+    print(f"  Outlier removal: {below_min} below 1 min, {above_max} above threshold "
+          f"({total_removed} total, {pct_removed:.1f}% of intervals)")
+    print(f"  {len(df_s):,} headway observations retained.\n")
     return df_s
 
 
@@ -209,6 +239,208 @@ def summarize_headways(df_hw: pd.DataFrame) -> pd.DataFrame:
         {"N": "Northbound (→ Queens/Home)", "S": "Southbound (→ Manhattan)"}
     )
     return s.sort_values(["day_type", "time_bucket", "direction", "swap_period"])
+
+
+def verify_direction_convention(df: pd.DataFrame) -> None:
+    """
+    Verify that stop IDs map to expected train routes.
+      B06N + B06S pre-swap weekdays  → F train
+      B06N + B06S post-swap weekdays → M train
+    Exits with a non-zero code if the convention cannot be confirmed.
+    """
+    print("── Direction Convention Verification ──────────────────────────")
+    weekdays = df[df["is_weekday"]]
+    pre  = weekdays[weekdays["swap_period"] == "Before swap"]
+    post = weekdays[weekdays["swap_period"] == "After swap"]
+
+    pre_routes  = set(pre["route_id"].dropna().unique())
+    post_routes = set(post["route_id"].dropna().unique())
+    print(f"  Pre-swap weekday routes:  {sorted(pre_routes)}")
+    print(f"  Post-swap weekday routes: {sorted(post_routes)}")
+
+    fail = False
+    if "F" not in pre_routes:
+        print("  [FAIL] F train not found in pre-swap weekday data!")
+        fail = True
+    if "M" not in post_routes:
+        print("  [FAIL] M train not found in post-swap weekday data!")
+        fail = True
+    for stop in ["B06N", "B06S"]:
+        if stop not in df["stop_id"].values:
+            print(f"  [FAIL] Expected stop {stop} not found in data!")
+            fail = True
+    if fail:
+        print("  Aborting — fix direction convention before analysis.")
+        sys.exit(1)
+
+    print("  [OK] F pre-swap, M post-swap. Both B06N and B06S present.\n")
+
+
+def validate_data_completeness(df: pd.DataFrame) -> None:
+    """
+    Check for date gaps and days with suspiciously few arrivals.
+    Warns on gaps > 3 days or days with < 10 Roosevelt Island arrivals.
+    Prompts the user to continue if critical issues are found.
+    """
+    print("── Data Completeness Check ─────────────────────────────────────")
+    dates = sorted(df["arrival_date"].unique())
+    if not dates:
+        print("  [FAIL] No dates found in data!")
+        sys.exit(1)
+
+    print(f"  Date range: {dates[0]} → {dates[-1]}  ({len(dates)} distinct days)")
+
+    # Check for gaps > 3 days
+    gaps = []
+    prev = None
+    for d in dates:
+        if prev is not None:
+            gap = (d - prev).days
+            if gap > 3:
+                gaps.append((prev, d, gap))
+        prev = d
+
+    if gaps:
+        print(f"  [WARN] {len(gaps)} gap(s) > 3 days detected:")
+        for g_start, g_end, g_days in gaps:
+            print(f"         {g_start} → {g_end}  ({g_days} days missing)")
+    else:
+        print("  [OK]  No gaps > 3 days found.")
+
+    # Check for days with very few arrivals
+    daily_counts = df.groupby("arrival_date").size()
+    low_days = daily_counts[daily_counts < 10]
+    if not low_days.empty:
+        print(f"  [WARN] {len(low_days)} day(s) with < 10 RI arrivals (possible bad data):")
+        for d, n in low_days.items():
+            print(f"         {d}: {n} arrivals")
+    else:
+        print("  [OK]  All days have ≥ 10 Roosevelt Island arrivals.")
+
+    critical = len(gaps) > 5 or not low_days.empty
+    if critical:
+        answer = input("\n  Data quality issues found. Continue anyway? [y/N] ").strip().lower()
+        if answer != "y":
+            print("  Aborting.")
+            sys.exit(0)
+
+    print()
+
+
+def analyze_storm_impact(df_hw: pd.DataFrame) -> None:
+    """
+    Three-period headway comparison around the January 2026 blizzard:
+      1. Pre-swap       (F train, before Dec 8)
+      2. Post-swap pre-storm  (M train, Dec 8 – Jan 24)
+      3. Post-storm     (M train, Jan 25+)
+
+    Swap-active hours only (Morning Rush + Midday + Evening Rush), weekdays.
+    """
+    SWAP_ACTIVE = {"2:", "3:", "4:"}
+    wd_swap = df_hw[
+        df_hw["is_weekday"] &
+        df_hw["time_bucket"].str[:2].isin(SWAP_ACTIVE)
+    ]
+
+    pre   = wd_swap[wd_swap["arrival_date"] < SWAP_DATE]
+    mid   = wd_swap[
+        (wd_swap["arrival_date"] >= SWAP_DATE) &
+        (wd_swap["arrival_date"] <  STORM_DATE)
+    ]
+    post  = wd_swap[wd_swap["arrival_date"] >= STORM_DATE]
+
+    print("── Storm Impact Analysis ───────────────────────────────────────")
+    print(f"  Storm date: {STORM_DATE}  (Jan 2026 blizzard)\n")
+    periods = [
+        ("Pre-swap  (F train, before Dec 8) ", pre),
+        ("Post-swap pre-storm (M, Dec 8–Jan 24)", mid),
+        ("Post-storm (M train, Jan 25+)     ", post),
+    ]
+    medians = {}
+    for label, sub in periods:
+        if sub.empty:
+            print(f"  {label}: no data")
+            continue
+        m = sub["headway_min"].median()
+        p = sub["headway_min"].quantile(0.90)
+        medians[label] = m
+        print(f"  {label}: median={m:.1f} min, p90={p:.1f} min, n={len(sub):,}")
+
+    vals = list(medians.values())
+    if len(vals) >= 2:
+        swap_effect = (vals[1] - vals[0]) / vals[0] * 100
+        print(f"\n  Swap effect (pre→post-swap pre-storm): {swap_effect:+.0f}%")
+    if len(vals) >= 3:
+        storm_effect = (vals[2] - vals[1]) / vals[1] * 100
+        print(f"  Storm effect (pre-storm→post-storm):   {storm_effect:+.0f}%")
+    print()
+
+
+def analyze_holiday_impact(df_hw: pd.DataFrame) -> None:
+    """
+    Compare post-swap headways during holiday weeks vs. non-holiday weeks.
+    Helps confirm whether holiday reduced-service periods skew the results.
+    """
+    post = df_hw[
+        df_hw["is_weekday"] &
+        (df_hw["swap_period"] == "After swap") &
+        df_hw["time_bucket"].str[:2].isin({"2:", "3:", "4:"})
+    ]
+    holiday     = post[post["is_holiday_week"]]
+    non_holiday = post[~post["is_holiday_week"]]
+
+    print("── Holiday Week Impact ─────────────────────────────────────────")
+    for label, sub in [("Holiday weeks", holiday), ("Non-holiday weeks", non_holiday)]:
+        if sub.empty:
+            print(f"  {label}: no data")
+            continue
+        print(f"  {label}: median={sub['headway_min'].median():.1f} min, "
+              f"n={len(sub):,}")
+
+    if not holiday.empty and not non_holiday.empty:
+        diff = holiday["headway_min"].median() - non_holiday["headway_min"].median()
+        print(f"  Holiday vs. non-holiday difference: {diff:+.1f} min")
+        note = ("Holidays inflate post-swap medians." if diff > 1
+                else "Holiday effect is minimal — results are robust.")
+        print(f"  → {note}")
+    print()
+
+
+def analyze_weekend_control_group(df_hw: pd.DataFrame) -> None:
+    """
+    Explicit weekend before/after comparison as a control group.
+    The F train runs on weekends in both periods, so any headway change
+    here reflects systemwide F-line drift — NOT the swap itself.
+    """
+    we = df_hw[df_hw["day_type"] == "Weekend"]
+    before = we[we["swap_period"] == "Before swap"]["headway_min"]
+    after  = we[we["swap_period"] == "After swap"]["headway_min"]
+
+    print("── Weekend Control Group (F train both periods) ────────────────")
+    print("  Changes here = systemwide F drift, NOT the M swap.\n")
+
+    bucket_map = [
+        ("2:", "Morning (6–9 AM)       "),
+        ("3:", "Midday (9 AM–4 PM)     "),
+        ("4:", "Afternoon/Eve (4–7 PM) "),
+    ]
+    for prefix, label in bucket_map:
+        bef = we[we["time_bucket"].str.startswith(prefix) & (we["swap_period"] == "Before swap")]["headway_min"]
+        aft = we[we["time_bucket"].str.startswith(prefix) & (we["swap_period"] == "After swap")]["headway_min"]
+        if bef.empty or aft.empty:
+            continue
+        diff = aft.median() - bef.median()
+        pct  = diff / bef.median() * 100
+        print(f"  {label}: {bef.median():.1f} → {aft.median():.1f} min  ({pct:+.0f}%)")
+
+    if not before.empty and not after.empty:
+        d = after.median() - before.median()
+        p = d / before.median() * 100
+        interp = ("systemwide F service degradation" if d > 0.5
+                  else "no meaningful baseline drift")
+        print(f"\n  Overall weekend: {before.median():.1f} → {after.median():.1f} min  ({p:+.0f}%)")
+        print(f"  Interpretation: suggests {interp}.")
+    print()
 
 
 def _bucket_order(df_hw, day_type):
@@ -550,6 +782,11 @@ def main():
 
     df_raw = load_all_data(RAW_DATA_DIR)
     df     = add_analysis_columns(df_raw)
+
+    # ── Phase 1: Validation ──────────────────────────────────────────────
+    verify_direction_convention(df)
+    validate_data_completeness(df)
+
     df_hw  = compute_headways(df)
 
     hw_path = os.path.join(RESULTS_DIR, "roosevelt_island_headways.csv")
@@ -562,6 +799,12 @@ def main():
     print(summary.to_string(index=False))
     print()
 
+    # ── Phase 2: Extended analysis ───────────────────────────────────────
+    analyze_storm_impact(df_hw)
+    analyze_holiday_impact(df_hw)
+    analyze_weekend_control_group(df_hw)
+
+    # ── Phase 3: Charts + report ─────────────────────────────────────────
     plot_distribution(df_hw, "Weekday", RESULTS_DIR)
     plot_distribution(df_hw, "Weekend", RESULTS_DIR)
     plot_hourly_headways(df_hw, RESULTS_DIR)

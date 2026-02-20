@@ -477,7 +477,7 @@ PLOTLY_LAYOUT = dict(
     font=dict(family="DM Sans, sans-serif", color=TEXT_LIGHT),
     xaxis=dict(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, tickfont=dict(size=10)),
     yaxis=dict(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, tickfont=dict(size=10)),
-    margin=dict(l=10, r=10, t=100, b=80),
+    margin=dict(l=70, r=20, t=100, b=80),
 )
 
 LEGEND_BASE = dict(
@@ -565,9 +565,9 @@ def direction_overview_fig(df: pd.DataFrame, direction: str, dir_label: str) -> 
         **PLOTLY_LAYOUT,
         title=dict(text=f"<b>{dir_label}</b> — All Time Periods", font=dict(size=15)),
         barmode="overlay",
-        yaxis_title="Median minutes between trains",
+        yaxis_title="Wait (min)",
         height=470,
-        legend=dict(**LEGEND_BASE, orientation="h", x=0.5, xanchor="center", y=-0.2, yanchor="top"),
+        legend=dict(**LEGEND_BASE, orientation="h", x=0.5, xanchor="center", y=-0.25, yanchor="top"),
     )
     fig.update_xaxes(tickmode="array", tickvals=x_pos, ticktext=tick_labels,
                      tickangle=-30, tickfont=dict(size=10))
@@ -605,7 +605,7 @@ def long_wait_fig(df: pd.DataFrame, direction: str, dir_label: str) -> go.Figure
         yaxis_title="% of train intervals",
         yaxis_range=[0, max(max(bef_pcts), max(aft_pcts)) * 1.5],
         height=450,
-        legend=dict(**LEGEND_BASE, orientation="h", x=0.5, xanchor="center", y=-0.2, yanchor="top"),
+        legend=dict(**LEGEND_BASE, orientation="h", x=0.5, xanchor="center", y=-0.25, yanchor="top"),
     )
     return fig
 
@@ -651,10 +651,10 @@ def evening_spotlight_fig(df: pd.DataFrame) -> go.Figure:
         **PLOTLY_LAYOUT,
         title=dict(text="<b>Evening Rush Hour (4–7 PM)</b><br><sup>Wait times have more than doubled since the F/M swap</sup>", font=dict(size=15)),
         barmode="group",
-        yaxis_title="Median minutes between trains",
+        yaxis_title="Wait (min)",
         yaxis_range=[0, max(max(aft_p), max(bef_p)) * 1.5],
         height=530,
-        legend=dict(**LEGEND_BASE, orientation="h", x=0.5, xanchor="center", y=-0.2, yanchor="top"),
+        legend=dict(**LEGEND_BASE, orientation="h", x=0.5, xanchor="center", y=-0.25, yanchor="top"),
     )
     return fig
 
@@ -707,10 +707,10 @@ def weekend_fig(df: pd.DataFrame) -> go.Figure:
         ),
         barmode="group",
         height=490,
-        legend=dict(**LEGEND_BASE, orientation="h", x=0.5, xanchor="center", y=-0.2, yanchor="top"),
+        legend=dict(**LEGEND_BASE, orientation="h", x=0.5, xanchor="center", y=-0.25, yanchor="top"),
     )
     fig.update_xaxes(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, tickangle=-45, tickfont=dict(size=10))
-    fig.update_yaxes(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, title_text="Median minutes between trains", col=1)
+    fig.update_yaxes(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, title_text="Wait (min)", col=1)
     fig.update_layout(margin=dict(l=10, r=10, t=70, b=60))
     return fig
 

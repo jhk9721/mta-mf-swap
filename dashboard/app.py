@@ -477,7 +477,7 @@ PLOTLY_LAYOUT = dict(
     font=dict(family="DM Sans, sans-serif", color=TEXT_LIGHT),
     xaxis=dict(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, tickfont=dict(size=10)),
     yaxis=dict(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, tickfont=dict(size=10)),
-    margin=dict(l=10, r=10, t=50, b=10),
+    margin=dict(l=10, r=10, t=100, b=80),
 )
 
 LEGEND_BASE = dict(
@@ -520,13 +520,13 @@ def direction_overview_fig(df: pd.DataFrame, direction: str, dir_label: str) -> 
 
     fig = go.Figure()
     fig.add_trace(go.Bar(
-        name="F Train (before Dec 8)",
+        name="Before (F)",
         x=[xi - width / 2 for xi in x_pos], y=bef_med,
         width=width, marker_color=BLUE_BEFORE,
         hovertemplate="<b>Before swap</b><br>Median: %{y:.1f} min<extra></extra>",
     ))
     fig.add_trace(go.Bar(
-        name="M Train (after Dec 8)",
+        name="After (M)",
         x=[xi + width / 2 for xi in x_pos], y=aft_med,
         width=width, marker_color=RED_AFTER,
         hovertemplate="<b>After swap</b><br>Median: %{y:.1f} min<extra></extra>",
@@ -549,7 +549,7 @@ def direction_overview_fig(df: pd.DataFrame, direction: str, dir_label: str) -> 
         pct = (av - bv) / bv * 100
         color = RED_AFTER if pct > 0 else GREEN_OK
         fig.add_annotation(
-            x=x_pos[i], y=max(aft_p90[i], bef_p90[i]) + 1.2,
+            x=x_pos[i], y=max(aft_p90[i], bef_p90[i]) + 2.5,
             text=f"<b>{pct:+.0f}%</b>",
             showarrow=False, font=dict(size=12, color=color),
             bgcolor="rgba(0,0,0,0)",
@@ -566,8 +566,8 @@ def direction_overview_fig(df: pd.DataFrame, direction: str, dir_label: str) -> 
         title=dict(text=f"<b>{dir_label}</b> — All Time Periods", font=dict(size=15)),
         barmode="overlay",
         yaxis_title="Median minutes between trains",
-        height=420,
-        legend=dict(**LEGEND_BASE, orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        height=470,
+        legend=dict(**LEGEND_BASE, orientation="h", x=0.5, xanchor="center", y=-0.2, yanchor="top"),
     )
     fig.update_xaxes(tickmode="array", tickvals=x_pos, ticktext=tick_labels,
                      tickangle=-30, tickfont=dict(size=10))
@@ -585,14 +585,14 @@ def long_wait_fig(df: pd.DataFrame, direction: str, dir_label: str) -> go.Figure
 
     fig = go.Figure()
     fig.add_trace(go.Bar(
-        name="F Train (before)", x=labels, y=bef_pcts,
+        name="Before (F)", x=labels, y=bef_pcts,
         marker_color=BLUE_BEFORE, offsetgroup=0,
         hovertemplate="<b>%{x}</b><br>Before: %{y:.0f}% of waits<extra></extra>",
         text=[f"{v:.0f}%" for v in bef_pcts],
         textposition="outside", textfont=dict(color=BLUE_BEFORE, size=11),
     ))
     fig.add_trace(go.Bar(
-        name="M Train (after)", x=labels, y=aft_pcts,
+        name="After (M)", x=labels, y=aft_pcts,
         marker_color=RED_AFTER, offsetgroup=1,
         hovertemplate="<b>%{x}</b><br>After: %{y:.0f}% of waits<extra></extra>",
         text=[f"{v:.0f}%" for v in aft_pcts],
@@ -603,9 +603,9 @@ def long_wait_fig(df: pd.DataFrame, direction: str, dir_label: str) -> go.Figure
         title=dict(text=f"<b>Long Wait Frequency — {dir_label}</b><br><sup>Weekdays, 6 AM–7 PM (swap-active hours)</sup>", font=dict(size=14)),
         barmode="group",
         yaxis_title="% of train intervals",
-        yaxis_range=[0, max(max(bef_pcts), max(aft_pcts)) * 1.35],
-        height=400,
-        legend=dict(**LEGEND_BASE, orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        yaxis_range=[0, max(max(bef_pcts), max(aft_pcts)) * 1.5],
+        height=450,
+        legend=dict(**LEGEND_BASE, orientation="h", x=0.5, xanchor="center", y=-0.2, yanchor="top"),
     )
     return fig
 
@@ -623,14 +623,14 @@ def evening_spotlight_fig(df: pd.DataFrame) -> go.Figure:
 
     fig = go.Figure()
     fig.add_trace(go.Bar(
-        name="F Train (before Dec 8)", x=labels, y=bef,
+        name="Before (F)", x=labels, y=bef,
         marker_color=BLUE_BEFORE, offsetgroup=0,
         text=[f"{v:.1f} min" for v in bef],
         textposition="inside", textfont=dict(color="white", size=13, family="Barlow Condensed"),
         hovertemplate="<b>%{x}</b><br>Median (before): %{y:.1f} min<extra></extra>",
     ))
     fig.add_trace(go.Bar(
-        name="M Train (after Dec 8)", x=labels, y=aft,
+        name="After (M)", x=labels, y=aft,
         marker_color=RED_AFTER, offsetgroup=1,
         text=[f"{v:.1f} min" for v in aft],
         textposition="inside", textfont=dict(color="white", size=13, family="Barlow Condensed"),
@@ -652,8 +652,9 @@ def evening_spotlight_fig(df: pd.DataFrame) -> go.Figure:
         title=dict(text="<b>Evening Rush Hour (4–7 PM)</b><br><sup>Wait times have more than doubled since the F/M swap</sup>", font=dict(size=15)),
         barmode="group",
         yaxis_title="Median minutes between trains",
-        height=480,
-        legend=dict(**LEGEND_BASE, orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1),
+        yaxis_range=[0, max(max(aft_p), max(bef_p)) * 1.5],
+        height=530,
+        legend=dict(**LEGEND_BASE, orientation="h", x=0.5, xanchor="center", y=-0.2, yanchor="top"),
     )
     return fig
 
@@ -676,13 +677,13 @@ def weekend_fig(df: pd.DataFrame) -> go.Figure:
             bef_med.append(b.median()); aft_med.append(a.median())
 
         fig.add_trace(go.Bar(
-            name="F before Dec 8" if col_idx == 1 else None,
+            name="Before (F)" if col_idx == 1 else None,
             x=labels, y=bef_med, marker_color=BLUE_BEFORE,
             offsetgroup=0, showlegend=(col_idx == 1),
             hovertemplate="<b>%{x}</b><br>Median (before): %{y:.1f} min<extra></extra>",
         ), row=1, col=col_idx)
         fig.add_trace(go.Bar(
-            name="F after Dec 8" if col_idx == 1 else None,
+            name="After (M)" if col_idx == 1 else None,
             x=labels, y=aft_med, marker_color=RED_AFTER,
             offsetgroup=1, showlegend=(col_idx == 1),
             hovertemplate="<b>%{x}</b><br>Median (after): %{y:.1f} min<extra></extra>",
@@ -705,8 +706,8 @@ def weekend_fig(df: pd.DataFrame) -> go.Figure:
             font=dict(size=14),
         ),
         barmode="group",
-        height=440,
-        legend=dict(**LEGEND_BASE, orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1),
+        height=490,
+        legend=dict(**LEGEND_BASE, orientation="h", x=0.5, xanchor="center", y=-0.2, yanchor="top"),
     )
     fig.update_xaxes(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, tickangle=-45, tickfont=dict(size=10))
     fig.update_yaxes(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, title_text="Median minutes between trains", col=1)
@@ -749,7 +750,7 @@ def sensitivity_fig(df: pd.DataFrame) -> go.Figure:
     for i in range(1, len(medians)):
         pct = (medians[i] - base) / base * 100
         fig.add_annotation(
-            x=labels[i], y=medians[i] + 0.3,
+            x=labels[i], y=medians[i] + 1.2,
             text=f"<b>{pct:+.0f}% vs pre-swap</b>",
             showarrow=False,
             font=dict(size=12, color=RED_AFTER),

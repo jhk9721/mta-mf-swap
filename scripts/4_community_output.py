@@ -3,14 +3,17 @@ SCRIPT 4: COMMUNITY OUTPUT (v2)
 """
 
 import os
+from pathlib import Path
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from datetime import date
 
-RESULTS_DIR   = "results"
-COMMUNITY_DIR = os.path.join(RESULTS_DIR, "community")
+# Paths are resolved relative to this script's location so the script works
+# regardless of which directory it is invoked from.
+RESULTS_DIR   = Path(__file__).parent / "results"
+COMMUNITY_DIR = RESULTS_DIR / "community"
 SWAP_DATE     = date(2025, 12, 8)
 
 TIME_BUCKETS = [
@@ -96,7 +99,7 @@ def plot_all_periods(df, out_dir):
     ax.annotate("★ shaded = swap active (weekdays only)", xy=(1.0, 0.03), xycoords="axes fraction", fontsize=9, color="#999999", ha="right", style="italic")
     fig.text(0.5, 0.01, SOURCE_NOTE, ha="center", fontsize=9, color="gray")
     plt.tight_layout(rect=[0, 0.04, 1, 1])
-    path = os.path.join(out_dir, "all_periods_comparison.png")
+    path = out_dir / "all_periods_comparison.png"
     plt.savefig(path, dpi=180, bbox_inches="tight"); plt.close()
     print(f"Saved: {path}")
 
@@ -128,7 +131,7 @@ def plot_evening_rush_spotlight(df, out_dir):
     ax.set_ylim(0, max(after_p) * 1.4)
     fig.text(0.5, 0.01, SOURCE_NOTE + "  |  Weekdays only", ha="center", fontsize=9, color="gray")
     plt.tight_layout(rect=[0, 0.04, 1, 1])
-    path = os.path.join(out_dir, "evening_rush_spotlight.png")
+    path = out_dir / "evening_rush_spotlight.png"
     plt.savefig(path, dpi=180, bbox_inches="tight"); plt.close()
     print(f"Saved: {path}")
 
@@ -182,7 +185,7 @@ def plot_direction_overview(df, out_dir, direction_code, direction_label, filena
     ax.annotate("★ shaded = swap active (weekdays only)", xy=(1.0, 0.03), xycoords="axes fraction", fontsize=9, color="#999999", ha="right", style="italic")
     fig.text(0.5, 0.01, SOURCE_NOTE, ha="center", fontsize=9, color="gray")
     plt.tight_layout(rect=[0, 0.04, 1, 1])
-    path = os.path.join(out_dir, filename)
+    path = out_dir / filename
     plt.savefig(path, dpi=180, bbox_inches="tight"); plt.close()
     print(f"Saved: {path}")
 
@@ -213,7 +216,7 @@ def plot_long_wait_frequency(df, out_dir, direction_code, direction_label, filen
     ax.set_ylim(0, max(max(before_pcts), max(after_pcts)) * 1.35)
     fig.text(0.5, 0.01, SOURCE_NOTE, ha="center", fontsize=9, color="gray")
     plt.tight_layout(rect=[0, 0.04, 1, 1])
-    path = os.path.join(out_dir, filename)
+    path = out_dir / filename
     plt.savefig(path, dpi=180, bbox_inches="tight"); plt.close()
     print(f"Saved: {path}")
 
@@ -279,7 +282,7 @@ def plot_weekend_impact(df, out_dir):
              "Increases suggest broader F-line service changes affecting Roosevelt Island on weekends.",
              ha="center", fontsize=9, color="#555555", style="italic")
     plt.tight_layout()
-    path = os.path.join(out_dir, "weekend_impact.png")
+    path = out_dir / "weekend_impact.png"
     plt.savefig(path, dpi=180, bbox_inches="tight"); plt.close()
     print(f"Saved: {path}")
 
@@ -307,7 +310,7 @@ def plot_worst_waits(df, out_dir):
     ax.set_ylim(0, max(max(before_pcts), max(after_pcts)) * 1.3)
     fig.text(0.5, 0.01, SOURCE_NOTE, ha="center", fontsize=9, color="gray")
     plt.tight_layout(rect=[0, 0.04, 1, 1])
-    path = os.path.join(out_dir, "worst_waits.png")
+    path = out_dir / "worst_waits.png"
     plt.savefig(path, dpi=180, bbox_inches="tight"); plt.close()
     print(f"Saved: {path}")
 
@@ -428,15 +431,15 @@ METHODOLOGY — FOR CREDIBILITY IF CHALLENGED
   them would make the post-swap numbers appear slightly worse.
 - Observed (actual) headways only — not scheduled headways.
 """
-    path = os.path.join(out_dir, "talking_points.txt")
+    path = out_dir / "talking_points.txt"
     with open(path, "w") as f: f.write(content)
     print(f"Saved: {path}"); print(content)
 
 
 def main():
-    os.makedirs(COMMUNITY_DIR, exist_ok=True)
-    csv_path = os.path.join(RESULTS_DIR, "roosevelt_island_headways.csv")
-    if not os.path.exists(csv_path):
+    COMMUNITY_DIR.mkdir(parents=True, exist_ok=True)
+    csv_path = RESULTS_DIR / "roosevelt_island_headways.csv"
+    if not csv_path.exists():
         raise FileNotFoundError(f"Cannot find {csv_path}. Run 3_analyze.py first.")
     df = load_and_prep(csv_path)
 
@@ -477,7 +480,7 @@ def main():
     plot_weekend_impact(df, COMMUNITY_DIR)
 
     write_talking_points(df, COMMUNITY_DIR)
-    print(f"\nAll community outputs saved to: {os.path.abspath(COMMUNITY_DIR)}/")
+    print(f"\nAll community outputs saved to: {COMMUNITY_DIR.resolve()}/")
 
 if __name__ == "__main__":
     main()

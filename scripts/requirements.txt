@@ -1,0 +1,10 @@
+# Roosevelt Island MTA F/M Swap — Script Dependencies
+# Install with: pip install -r requirements.txt
+# Verified against Python 3.9+
+
+requests>=2.31.0
+pandas>=2.0.0
+numpy>=1.24.0
+matplotlib>=3.7.0
+plotly>=5.18.0
+tqdm>=4.65.0

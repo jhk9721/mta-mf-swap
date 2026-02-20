@@ -313,15 +313,39 @@ st.markdown(f"""
 
   /* ── Mobile responsive ── */
   @media (max-width: 768px) {{
+    /* Typography */
     .header-title    {{ font-size: 1.6rem !important; line-height: 1.2 !important; }}
     .header-subtitle {{ font-size: 0.9rem !important; }}
     .big-stat-number {{ font-size: 2rem !important; }}
     .metric-value    {{ font-size: 2rem !important; }}
     .metric-label    {{ font-size: 0.65rem !important; }}
     .metric-card     {{ margin-bottom: 1rem; }}
-    .nav-bar a       {{ margin: 0 0.5rem; font-size: 0.78rem; }}
-    /* Force Streamlit columns to stack on narrow screens */
+    p, .qa-a, .callout, .plain-summary {{ font-size: 0.95rem !important; line-height: 1.6 !important; }}
+    .section-head    {{ font-size: 1.2rem !important; }}
+
+    /* Sticky nav */
+    .nav-bar {{
+      position: sticky;
+      top: 0;
+      z-index: 999;
+      padding: 0.5rem 0.75rem;
+      overflow-x: auto;
+      white-space: nowrap;
+    }}
+    .nav-bar a {{ margin: 0 0.5rem; font-size: 0.78rem; }}
+
+    /* Stack Streamlit columns */
     [data-testid="column"] {{ width: 100% !important; flex: 100% !important; }}
+
+    /* CTA buttons: stack vertically, full-width, generous touch target */
+    .cta-row {{ flex-direction: column !important; }}
+    .cta-row > * {{ min-height: 64px; width: 100% !important; box-sizing: border-box; }}
+
+    /* Content padding */
+    .block-container {{
+      padding-left: 1rem !important;
+      padding-right: 1rem !important;
+    }}
   }}
 </style>
 """, unsafe_allow_html=True)
@@ -451,8 +475,8 @@ PLOTLY_LAYOUT = dict(
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor=MID_NAVY,
     font=dict(family="DM Sans, sans-serif", color=TEXT_LIGHT),
-    xaxis=dict(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, tickfont=dict(size=11)),
-    yaxis=dict(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, tickfont=dict(size=11)),
+    xaxis=dict(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, tickfont=dict(size=10)),
+    yaxis=dict(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, tickfont=dict(size=10)),
     margin=dict(l=10, r=10, t=50, b=10),
 )
 
@@ -485,7 +509,7 @@ def direction_overview_fig(df: pd.DataFrame, direction: str, dir_label: str) -> 
         b = sub[sub["swap_period"] == "Before swap"]["headway_min"]
         a = sub[sub["swap_period"] == "After swap"]["headway_min"]
         if b.empty or a.empty: continue
-        tick_labels.append(label.replace(" (", "<br>("))
+        tick_labels.append(label.split(" (")[0])  # "Morning Rush", "Midday", etc.
         bef_med.append(b.median()); aft_med.append(a.median())
         bef_p90.append(b.quantile(0.90)); aft_p90.append(a.quantile(0.90))
         active.append(label in SWAP_ACTIVE_BUCKETS)
@@ -545,7 +569,8 @@ def direction_overview_fig(df: pd.DataFrame, direction: str, dir_label: str) -> 
         height=420,
         legend=dict(**LEGEND_BASE, orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
-    fig.update_xaxes(tickmode="array", tickvals=x_pos, ticktext=tick_labels)
+    fig.update_xaxes(tickmode="array", tickvals=x_pos, ticktext=tick_labels,
+                     tickangle=-30, tickfont=dict(size=10))
     return fig
 
 
@@ -683,7 +708,7 @@ def weekend_fig(df: pd.DataFrame) -> go.Figure:
         height=440,
         legend=dict(**LEGEND_BASE, orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1),
     )
-    fig.update_xaxes(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, tickangle=-30, tickfont=dict(size=10))
+    fig.update_xaxes(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, tickangle=-45, tickfont=dict(size=10))
     fig.update_yaxes(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, title_text="Median minutes between trains", col=1)
     fig.update_layout(margin=dict(l=10, r=10, t=70, b=60))
     return fig
@@ -759,7 +784,7 @@ with stat_col:
     </div>
     """, unsafe_allow_html=True)
 
-st.plotly_chart(evening_spotlight_fig(df), use_container_width=True)
+st.plotly_chart(evening_spotlight_fig(df), use_container_width=True, config={"displayModeBar": False})
 
 st.markdown(f"""
 <div class="callout alarm">
@@ -791,9 +816,9 @@ st.markdown(f"""
 
 col1, col2 = st.columns(2)
 with col1:
-    st.plotly_chart(direction_overview_fig(df, "S", "Southbound (→ Manhattan)"), use_container_width=True)
+    st.plotly_chart(direction_overview_fig(df, "S", "Southbound (→ Manhattan)"), use_container_width=True, config={"displayModeBar": False})
 with col2:
-    st.plotly_chart(direction_overview_fig(df, "N", "Northbound (→ Queens/Home)"), use_container_width=True)
+    st.plotly_chart(direction_overview_fig(df, "N", "Northbound (→ Queens/Home)"), use_container_width=True, config={"displayModeBar": False})
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -899,20 +924,18 @@ st.markdown(f"""
 
 col1, col2 = st.columns(2)
 with col1:
-    st.plotly_chart(long_wait_fig(df, "S", "Southbound (→ Manhattan)"), use_container_width=True)
+    st.plotly_chart(long_wait_fig(df, "S", "Southbound (→ Manhattan)"), use_container_width=True, config={"displayModeBar": False})
 with col2:
-    st.plotly_chart(long_wait_fig(df, "N", "Northbound (→ Queens/Home)"), use_container_width=True)
+    st.plotly_chart(long_wait_fig(df, "N", "Northbound (→ Queens/Home)"), use_container_width=True, config={"displayModeBar": False})
 
-st.markdown(f"""
-<div class="callout">
-  <strong>Reading this chart:</strong> Each bar shows what share of train gaps exceeded a given threshold
-  during swap-active hours (6 AM–7 PM weekdays). There is now a <strong>1-in-3 chance</strong> of
-  waiting 10+ minutes for the northbound train home — up from 1-in-5 before the swap.
-  Every evening commute carries meaningful risk of a long delay.
-  Daily round-trip commuters lose roughly <strong>{monthly_extra:.0f} extra minutes per month</strong>
-  just standing on the platform.
-</div>
-""", unsafe_allow_html=True)
+with st.expander("ℹ️ How to read this chart"):
+    st.markdown(f"""
+Each bar shows what share of train gaps exceeded a given threshold during swap-active hours
+(6 AM–7 PM weekdays). There is now a **1-in-3 chance** of waiting 10+ minutes for the
+northbound train home — up from 1-in-5 before the swap. Every evening commute carries
+meaningful risk of a long delay. Daily round-trip commuters lose roughly
+**{monthly_extra:.0f} extra minutes per month** just standing on the platform.
+    """)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -956,7 +979,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 col1, col2 = st.columns(2)
 with col1:
     st.markdown('<div class="section-head">Was It the Storm?</div>', unsafe_allow_html=True)
-    st.plotly_chart(sensitivity_fig(df), use_container_width=True)
+    st.plotly_chart(sensitivity_fig(df), use_container_width=True, config={"displayModeBar": False})
 with col2:
     st.markdown('<div class="section-head">FAQs</div>', unsafe_allow_html=True)
     st.markdown(f"""
@@ -1052,7 +1075,7 @@ with st.expander("📊 How We Know This Is Real — Full Data & Methodology", ex
       of the M swap on weekdays. The gap between weekday and weekend increases isolates the swap's impact.
     </div>
     """, unsafe_allow_html=True)
-    st.plotly_chart(weekend_fig(df), use_container_width=True)
+    st.plotly_chart(weekend_fig(df), use_container_width=True, config={"displayModeBar": False})
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1063,7 +1086,7 @@ st.markdown('<a id="action"></a>', unsafe_allow_html=True)
 st.markdown('<div class="section-head">Roosevelt Island Deserves Better</div>', unsafe_allow_html=True)
 
 st.markdown(f"""
-<div style="display:flex; gap:1rem; margin-top:1.5rem;">
+<div class="cta-row" style="display:flex; gap:1rem; margin-top:1.5rem;">
 
   <a href="mailto:jmenin@council.nyc.gov?subject=Roosevelt%20Island%20F%2FM%20Swap%20Service%20Impact"
      onclick="
@@ -1159,6 +1182,33 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+
+# ── Back-to-top button (mobile) ───────────────────────────────────────────────
+st.markdown(f"""
+<style>
+  .back-to-top {{
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: {MTA_ORANGE};
+    color: white;
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    font-size: 22px;
+    line-height: 48px;
+    text-align: center;
+    text-decoration: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    z-index: 1000;
+    display: none;
+  }}
+  @media (max-width: 768px) {{
+    .back-to-top {{ display: block; }}
+  }}
+</style>
+<a href="#the-f-m-swap-is-hurting-roosevelt-island" class="back-to-top" title="Back to top">↑</a>
+""", unsafe_allow_html=True)
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.markdown("<br>", unsafe_allow_html=True)

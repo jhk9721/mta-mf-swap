@@ -15,8 +15,13 @@ build/
 venv/
 env/
 
-# Streamlit
+# Streamlit — never commit live secrets
 .streamlit/secrets.toml
+dashboard/.streamlit/secrets.toml
+
+# Analytics data (if local logging is added later)
+analytics_logs/
+*.analytics.json
 
 # OS
 .DS_Store

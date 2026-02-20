@@ -19,6 +19,7 @@ from data_loader import (
     load_headways, get_median, get_pct_over,
     SWAP_DATE, SWAP_ACTIVE_BUCKETS, TIME_BUCKETS
 )
+from analytics import init_analytics, track_scroll_depth
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -27,6 +28,9 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+
+# ── Analytics (privacy-first) ─────────────────────────────────────────────────
+init_analytics()
 
 # ── Theme constants ───────────────────────────────────────────────────────────
 MTA_ORANGE  = "#FF6319"   # accent / brand (borders, links, CTAs)
@@ -386,6 +390,9 @@ st.markdown(f"""
      style="color:{TEXT_LIGHT}; font-weight:600;">📊 GitHub</a>
 </div>
 """, unsafe_allow_html=True)
+
+# Track scroll depth for engagement metrics
+track_scroll_depth()
 
 # ── Plain-language summary ────────────────────────────────────────────────────
 st.markdown(f"""
@@ -1059,6 +1066,15 @@ col1, col2, col3 = st.columns(3)
 with col1:
     st.markdown(f"""
     <a href="mailto:jmenin@council.nyc.gov?subject=Roosevelt%20Island%20F%2FM%20Swap%20Service%20Impact"
+       onclick="
+         if (typeof gtag !== 'undefined') {{
+           gtag('event', 'cta_click', {{'button': 'contact_menin'}});
+         }}
+         if (typeof plausible !== 'undefined') {{
+           plausible('CTA Click', {{props: {{button: 'contact_menin'}}}});
+         }}
+         return true;
+       "
        style="background:{MTA_ORANGE}; display:block; padding:1.5rem 1.2rem; border-radius:8px;
               text-align:center; text-decoration:none;">
       <div style="font-size:2rem;">📧</div>
@@ -1069,6 +1085,15 @@ with col1:
 with col2:
     st.markdown(f"""
     <a href="https://github.com/jhk9721/mta-mf-swap" target="_blank"
+       onclick="
+         if (typeof gtag !== 'undefined') {{
+           gtag('event', 'cta_click', {{'button': 'github_download'}});
+         }}
+         if (typeof plausible !== 'undefined') {{
+           plausible('CTA Click', {{props: {{button: 'github_download'}}}});
+         }}
+         return true;
+       "
        style="background:{MID_NAVY}; border:2px solid {MTA_ORANGE}; display:block; padding:1.5rem 1.2rem;
               border-radius:8px; text-align:center; text-decoration:none;">
       <div style="font-size:2rem;">📊</div>
@@ -1078,12 +1103,30 @@ with col2:
     """, unsafe_allow_html=True)
 with col3:
     st.markdown(f"""
-    <div style="background:{MID_NAVY}; border:2px solid {MTA_ORANGE}; display:block; padding:1.5rem 1.2rem;
-                border-radius:8px; text-align:center; cursor:pointer;"
-         onclick="navigator.clipboard.writeText(window.location.href).then(()=>{{
-           this.querySelector('.share-label').textContent='Link Copied!';
-           setTimeout(()=>{{this.querySelector('.share-label').textContent='Share This Analysis';}},2000);
-         }})">
+    <div id="share-btn" style="background:{MID_NAVY}; border:2px solid {MTA_ORANGE}; display:block;
+                padding:1.5rem 1.2rem; border-radius:8px; text-align:center; cursor:pointer;"
+         onclick="
+           navigator.clipboard.writeText(window.location.href).then(function() {{
+             if (typeof gtag !== 'undefined') {{
+               gtag('event', 'cta_click', {{'button': 'share_link'}});
+             }}
+             if (typeof plausible !== 'undefined') {{
+               plausible('CTA Click', {{props: {{button: 'share_link'}}}});
+             }}
+             var btn = document.getElementById('share-btn');
+             var label = btn.querySelector('.share-label');
+             label.textContent = '✓ Link Copied!';
+             btn.style.background = '{GREEN_OK}';
+             btn.style.borderColor = '{GREEN_OK}';
+             setTimeout(function() {{
+               label.textContent = 'Share This Analysis';
+               btn.style.background = '{MID_NAVY}';
+               btn.style.borderColor = '{MTA_ORANGE}';
+             }}, 2000);
+           }}).catch(function(err) {{
+             alert('Could not copy — please copy manually: ' + window.location.href);
+           }});
+         ">
       <div style="font-size:2rem;">🔗</div>
       <div class="share-label" style="color:{TEXT_LIGHT}; font-weight:700; margin-top:0.5rem; font-size:0.95rem;">Share This Analysis</div>
       <div style="color:{TEXT_MUTED}; font-size:0.78rem; margin-top:0.2rem;">Copy link to clipboard</div>
@@ -1094,6 +1137,27 @@ st.markdown(f"""
 <div style="text-align:center; margin:2rem 0 1rem; color:{TEXT_MUTED}; font-size:0.88rem; line-height:1.6;">
   This analysis was prepared by Roosevelt Island residents using publicly available MTA data.<br>
   We welcome scrutiny — all code and data are public.
+</div>
+""", unsafe_allow_html=True)
+
+
+# ── Privacy statement ─────────────────────────────────────────────────────────
+st.markdown(f"""
+<div style="text-align:center; margin:1rem 0; padding:0.75rem; border-top:1px solid {LIGHT_NAVY};">
+  <details style="cursor:pointer; display:inline-block; text-align:left;">
+    <summary style="color:{TEXT_MUTED}; font-size:0.78rem; cursor:pointer;">Privacy &amp; Analytics</summary>
+    <div style="color:{TEXT_MUTED}; font-size:0.78rem; margin-top:0.5rem; max-width:560px; line-height:1.55;">
+      This site uses privacy-first analytics to understand usage patterns. We collect:
+      <ul style="margin:0.4rem 0 0.4rem 1.2rem;">
+        <li>Anonymous page views (no IP addresses stored)</li>
+        <li>Scroll depth and section views</li>
+        <li>Button clicks (email, GitHub, share)</li>
+      </ul>
+      We do <strong>not</strong> collect personal information, browsing history, or advertising data.
+      All data is anonymized and GDPR-compliant. View the
+      <a href="https://github.com/jhk9721/mta-mf-swap" style="color:{MTA_ORANGE};">open-source code</a>.
+    </div>
+  </details>
 </div>
 """, unsafe_allow_html=True)
 

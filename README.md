@@ -173,3 +173,95 @@ The **weekend charts** serve a specific analytical purpose. Since the swap is we
 Every number in our briefing materials can be reproduced from the scripts in this repository and the publicly available data on subwaydata.nyc. If you find an error, please open a GitHub issue. We will review it and correct the record if warranted.
 
 The analysis was conducted in Python using pandas, numpy, and matplotlib. No proprietary tools or private datasets were used at any stage.
+
+---
+
+## Analytics & Privacy
+
+This dashboard includes privacy-first analytics to understand usage patterns without compromising user privacy.
+
+### What Data Is Collected?
+
+**With Simple Logging (default — always on):**
+- Page view timestamps
+- Anonymous session ID (random UUID, not linkable to individuals)
+- Section views and scroll depth
+- Button clicks (email, GitHub, share)
+
+**NOT collected:**
+- IP addresses (fully anonymized or not transmitted)
+- Personal information
+- Cookies (none required)
+- Cross-site tracking
+- Advertising data
+
+### Where Is Data Stored?
+
+| Provider | Storage | Retention |
+|---|---|---|
+| Simple Logging | Streamlit Cloud logs (stdout) | Auto-deleted after 7 days |
+| Google Analytics | Google servers (GDPR-compliant) | Configurable |
+| Plausible | EU servers or self-hosted | Configurable |
+
+### How to Access Analytics
+
+**Simple Logging (default):**
+1. Go to Streamlit Cloud dashboard
+2. Click **Manage app → Logs**
+3. Search for `[ANALYTICS]`
+
+**Google Analytics:**
+1. Go to https://analytics.google.com
+2. Select your property → view real-time or historical reports
+
+**Plausible:**
+1. Go to `https://plausible.io/your-domain`
+
+### Configuration
+
+**Simple logging — no setup required.** Logs appear automatically in Streamlit Cloud.
+
+**Google Analytics (GA4):**
+1. Create a GA4 property at https://analytics.google.com
+2. Copy your Measurement ID (`G-XXXXXXXXXX`)
+3. In Streamlit Cloud: **Settings → Secrets**, add:
+```toml
+[analytics]
+google_analytics_id = "G-XXXXXXXXXX"
+```
+4. Redeploy the app
+
+**Plausible:**
+1. Sign up at https://plausible.io and add your domain
+2. In Streamlit Cloud: **Settings → Secrets**, add:
+```toml
+[analytics]
+plausible_domain = "your-app.streamlit.app"
+```
+3. Redeploy the app
+
+See `dashboard/.streamlit/secrets.toml.example` for the full template.
+
+### Privacy Compliance
+
+- ✅ **GDPR** — No PII collected; IP anonymization enabled in GA4
+- ✅ **CCPA** — No personal data sold or shared
+- ✅ **Cookie-free** — Works without tracking cookies
+- ✅ **Transparent** — All tracking code is open source in this repo
+
+### For Users: How to Opt Out
+
+- **Browser extensions:** uBlock Origin, Privacy Badger, Brave (built-in)
+- **Browser settings:** Enable "Do Not Track"; use private/incognito mode
+
+The dashboard respects all opt-out signals and functions normally without analytics.
+
+### Testing
+
+```bash
+# Run the full analytics test suite
+pytest dashboard/tests/test_analytics.py -v
+
+# Run integration tests only
+pytest dashboard/tests/test_integration.py -v -m integration
+```

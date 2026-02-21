@@ -476,7 +476,7 @@ PLOTLY_LAYOUT = dict(
     plot_bgcolor=MID_NAVY,
     font=dict(family="DM Sans, sans-serif", color=TEXT_LIGHT),
     xaxis=dict(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, tickfont=dict(size=10)),
-    yaxis=dict(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, tickfont=dict(size=10)),
+    yaxis=dict(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, tickfont=dict(size=10), automargin=False),
     margin=dict(l=70, r=20, t=100, b=80),
 )
 

@@ -710,8 +710,8 @@ def weekend_fig(df: pd.DataFrame) -> go.Figure:
         legend=dict(**LEGEND_BASE, orientation="h", x=0.5, xanchor="center", y=-0.25, yanchor="top"),
     )
     fig.update_xaxes(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, tickangle=-45, tickfont=dict(size=10))
-    fig.update_yaxes(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, title_text="Wait (min)", col=1)
-    fig.update_layout(margin=dict(l=10, r=10, t=70, b=60))
+    fig.update_yaxes(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, automargin=False)
+    fig.update_yaxes(title_text="Wait (min)", col=1)
     return fig
 
 

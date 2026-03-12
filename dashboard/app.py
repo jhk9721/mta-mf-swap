@@ -1091,44 +1091,24 @@ st.markdown('<div class="section-head">Roosevelt Island Deserves Better</div>', 
 
 st.markdown(f"""
 <div style="display:flex; gap:1rem; margin-bottom:2rem; flex-wrap:wrap;">
-  <div style="flex:1; min-width:200px; background:{MTA_ORANGE}; padding:1.5rem 1.2rem;
-              border-radius:8px; text-align:center; cursor:pointer;"
-       onclick="
-         if (typeof gtag !== 'undefined') {{
-           gtag('event', 'cta_click', {{'button': 'contact_menin'}});
-         }}
-         if (typeof plausible !== 'undefined') {{
-           plausible('CTA Click', {{props: {{button: 'contact_menin'}}}});
-         }}
-         window.location.href='mailto:jmenin@council.nyc.gov?subject=Roosevelt%20Island%20F%2FM%20Swap%20Service%20Impact';">
+  <a id="contact-btn" href="mailto:jmenin@council.nyc.gov?subject=Roosevelt%20Island%20F%2FM%20Swap%20Service%20Impact"
+     style="flex:1; min-width:200px; background:{MTA_ORANGE}; padding:1.5rem 1.2rem;
+            border-radius:8px; text-align:center; cursor:pointer; text-decoration:none; display:block;">
     <div style="font-size:2rem;">📧</div>
     <div style="color:white; font-weight:700; margin-top:0.5rem; font-size:0.95rem;">Contact Council Member Menin</div>
     <div style="color:rgba(255,255,255,0.75); font-size:0.78rem; margin-top:0.2rem;">jmenin@council.nyc.gov</div>
-  </div>
-  <div style="flex:1; min-width:200px; background:{MID_NAVY}; border:2px solid {MTA_ORANGE};
-              padding:1.5rem 1.2rem; border-radius:8px; text-align:center; cursor:pointer;"
-       onclick="
-         if (typeof gtag !== 'undefined') {{
-           gtag('event', 'cta_click', {{'button': 'github_download'}});
-         }}
-         if (typeof plausible !== 'undefined') {{
-           plausible('CTA Click', {{props: {{button: 'github_download'}}}});
-         }}
-         window.open('https://github.com/jhk9721/mta-mf-swap', '_blank');">
+  </a>
+  <a id="download-btn" href="https://github.com/jhk9721/mta-mf-swap" target="_blank"
+     style="flex:1; min-width:200px; background:{MID_NAVY}; border:2px solid {MTA_ORANGE};
+            padding:1.5rem 1.2rem; border-radius:8px; text-align:center; cursor:pointer; text-decoration:none; display:block;">
     <div style="font-size:2rem;">📊</div>
     <div style="color:{TEXT_LIGHT}; font-weight:700; margin-top:0.5rem; font-size:0.95rem;">Download Full Analysis</div>
     <div style="color:{TEXT_MUTED}; font-size:0.78rem; margin-top:0.2rem;">Data, scripts &amp; methodology on GitHub</div>
-  </div>
+  </a>
   <div id="share-btn" style="flex:1; min-width:200px; background:{MID_NAVY}; border:2px solid {MTA_ORANGE};
               padding:1.5rem 1.2rem; border-radius:8px; text-align:center; cursor:pointer;"
        onclick="
          navigator.clipboard.writeText(window.location.href).then(function() {{
-           if (typeof gtag !== 'undefined') {{
-             gtag('event', 'cta_click', {{'button': 'share_link'}});
-           }}
-           if (typeof plausible !== 'undefined') {{
-             plausible('CTA Click', {{props: {{button: 'share_link'}}}});
-           }}
            var btn = document.getElementById('share-btn');
            var label = btn.querySelector('.share-label');
            label.textContent = '✓ Link Copied!';

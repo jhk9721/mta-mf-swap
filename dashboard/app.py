@@ -102,12 +102,16 @@ st.markdown(f"""
     border-bottom: 2px solid {LIGHT_NAVY};
     padding: 0.65rem 2rem;
     text-align: center;
-    margin: 0 -1rem 2rem -1rem;
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    margin: 0;
     z-index: 999;
     overflow-x: auto;
     white-space: nowrap;
+    box-sizing: border-box;
   }}
   .nav-bar a {{
     color: {TEXT_MUTED};
@@ -313,7 +317,7 @@ st.markdown(f"""
   .cta-btn:hover {{ opacity: 0.88; }}
 
   /* ── Hide Streamlit chrome ── */
-  #MainMenu, footer, header {{ visibility: hidden; }}
+  #MainMenu, footer, header {{ display: none; }}
   div[data-testid="stVerticalBlock"] > div {{ padding-top: 0; }}
 
   /* ── Mobile responsive ── */
@@ -411,6 +415,7 @@ st.markdown(f"""
   <a href="https://github.com/jhk9721/mta-mf-swap" target="_blank"
      style="color:{TEXT_LIGHT}; font-weight:600;">📊 GitHub</a>
 </div>
+<div style="height:48px"></div>
 """, unsafe_allow_html=True)
 
 # Track scroll depth for engagement metrics

@@ -103,6 +103,11 @@ st.markdown(f"""
     padding: 0.65rem 2rem;
     text-align: center;
     margin: 0 -1rem 2rem -1rem;
+    position: sticky;
+    top: 0;
+    z-index: 999;
+    overflow-x: auto;
+    white-space: nowrap;
   }}
   .nav-bar a {{
     color: {TEXT_MUTED};
@@ -323,15 +328,8 @@ st.markdown(f"""
     p, .qa-a, .callout, .plain-summary {{ font-size: 0.95rem !important; line-height: 1.6 !important; }}
     .section-head    {{ font-size: 1.2rem !important; }}
 
-    /* Sticky nav */
-    .nav-bar {{
-      position: sticky;
-      top: 0;
-      z-index: 999;
-      padding: 0.5rem 0.75rem;
-      overflow-x: auto;
-      white-space: nowrap;
-    }}
+    /* Sticky nav — tighter padding on mobile */
+    .nav-bar {{ padding: 0.5rem 0.75rem; }}
     .nav-bar a {{ margin: 0 0.5rem; font-size: 0.78rem; }}
 
     /* Stack Streamlit columns */

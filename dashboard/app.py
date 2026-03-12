@@ -1089,41 +1089,39 @@ st.markdown('<div class="section-head">Roosevelt Island Deserves Better</div>', 
 col1, col2, col3 = st.columns(3)
 with col1:
     st.markdown(f"""
-    <a href="mailto:jmenin@council.nyc.gov?subject=Roosevelt%20Island%20F%2FM%20Swap%20Service%20Impact"
-       onclick="
-         if (typeof gtag !== 'undefined') {{
-           gtag('event', 'cta_click', {{'button': 'contact_menin'}});
-         }}
-         if (typeof plausible !== 'undefined') {{
-           plausible('CTA Click', {{props: {{button: 'contact_menin'}}}});
-         }}
-         return true;
-       "
-       style="background:{MTA_ORANGE}; display:block; padding:1.5rem 1.2rem; border-radius:8px;
-              text-align:center; text-decoration:none;">
+    <div onclick="
+           if (typeof gtag !== 'undefined') {{
+             gtag('event', 'cta_click', {{'button': 'contact_menin'}});
+           }}
+           if (typeof plausible !== 'undefined') {{
+             plausible('CTA Click', {{props: {{button: 'contact_menin'}}}});
+           }}
+           window.location.href='mailto:jmenin@council.nyc.gov?subject=Roosevelt%20Island%20F%2FM%20Swap%20Service%20Impact';
+         "
+         style="background:{MTA_ORANGE}; display:block; padding:1.5rem 1.2rem; border-radius:8px;
+                text-align:center; cursor:pointer;">
       <div style="font-size:2rem;">📧</div>
       <div style="color:white; font-weight:700; margin-top:0.5rem; font-size:0.95rem;">Contact Council Member Menin</div>
       <div style="color:rgba(255,255,255,0.75); font-size:0.78rem; margin-top:0.2rem;">jmenin@council.nyc.gov</div>
-    </a>
+    </div>
     """, unsafe_allow_html=True)
 with col2:
     st.markdown(f"""
-    <a href="https://github.com/jhk9721/mta-mf-swap" target="_blank"
-       onclick="
-         if (typeof gtag !== 'undefined') {{
-           gtag('event', 'cta_click', {{'button': 'github_download'}});
-         }}
-         if (typeof plausible !== 'undefined') {{
-           plausible('CTA Click', {{props: {{button: 'github_download'}}}});
-         }}
-         return true;
-       "
-       style="background:{MID_NAVY}; border:2px solid {MTA_ORANGE}; display:block; padding:1.5rem 1.2rem;
-              border-radius:8px; text-align:center; text-decoration:none;">
+    <div onclick="
+           if (typeof gtag !== 'undefined') {{
+             gtag('event', 'cta_click', {{'button': 'github_download'}});
+           }}
+           if (typeof plausible !== 'undefined') {{
+             plausible('CTA Click', {{props: {{button: 'github_download'}}}});
+           }}
+           window.open('https://github.com/jhk9721/mta-mf-swap', '_blank');
+         "
+         style="background:{MID_NAVY}; border:2px solid {MTA_ORANGE}; display:block; padding:1.5rem 1.2rem;
+                border-radius:8px; text-align:center; cursor:pointer;">
       <div style="font-size:2rem;">📊</div>
       <div style="color:{TEXT_LIGHT}; font-weight:700; margin-top:0.5rem; font-size:0.95rem;">Download Full Analysis</div>
       <div style="color:{TEXT_MUTED}; font-size:0.78rem; margin-top:0.2rem;">Data, scripts &amp; methodology on GitHub</div>
-    </a>
+    </div>
     """, unsafe_allow_html=True)
 with col3:
     st.markdown(f"""

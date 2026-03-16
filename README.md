@@ -6,11 +6,22 @@ Last December, the MTA swapped which train serves Roosevelt Island on weekdays. 
 
 A group of Roosevelt Island residents felt their lived experience did not match this claim, so they decided to check.
 
-The MTA publishes real-time train location data — essentially a live feed of where every train in the system is at any given moment. A website called subwaydata.nyc archives that feed every single day. We downloaded nearly 40,000 individual train arrival records for Roosevelt Island, covering about five months, including before the swap and after it.
+The MTA publishes real-time train location data — essentially a live feed of where every train in the system is at any given moment. A website called subwaydata.nyc archives that feed every single day. We downloaded over 39,000 individual train arrival records for Roosevelt Island, covering October 2025 through February 15, 2026 — spanning the months before the swap and after it.
 
 We then measured something called a "headway" (how many minutes passed between one train arriving and the next one arriving). We did this for every train, every day, to answer the question: Are trains coming more or less frequently than before?
 
 The answer was stark. During the evening commute home, the gap between trains more than doubled, from about 4 minutes to about 8 minutes. During the morning commute to Manhattan, it went up 71%. Every single time period got worse. The MTA's promised "about 1 extra minute" turned out to be an extra 3 to 4 minutes in practice.
+
+# Scripts
+
+| Script | Purpose |
+|---|---|
+| `0_setup.py` | Environment verification — run this first |
+| `1_download.py` | Download raw GTFS data from subwaydata.nyc |
+| `2_inspect.py` | Verify stop IDs and inspect raw data |
+| `3_analyze.py` | Compute headways and produce the CSV |
+| `4_community_output.py` | Generate charts and talking points |
+| `test_scripts.py` | Automated output verification |
 
 We then found the MTA's own internal planning document from before the swap was implemented. It was signed by their Chief of Operations Planning and approved all the way up to the MTA President. That document explicitly admitted Roosevelt Island would face longer waits — and made a specific written promise to add extra M train service to mitigate the impact to roughly one extra minute of wait time. We can now show, with their own data, that the promise was not kept.
 We also built a public interactive website where anyone can explore the data themselves. And we put everything, including the raw data, the code, and the methodology, on GitHub so that anyone, including the MTA, can check our work.
@@ -44,6 +55,19 @@ The only way to do that is to use the MTA's own real-time location data, archive
 We used **[subwaydata.nyc](https://subwaydata.nyc)**, a website that archives the MTA's GTFS real-time feed every day. The GTFS (General Transit Feed Specification) real-time feed is the same data that powers apps like Google Maps and Citymapper — it's a continuous stream of train positions broadcast by the MTA itself.
 
 The critical difference between subwaydata.nyc and most transit apps is **completeness**. Most apps poll the feed periodically — they check in every few minutes and record what they see. subwaydata.nyc captures the full feed continuously. That means if a train comes and goes between two polling checks, subwaydata.nyc captures it; a polling-based system misses it entirely.
+
+---
+
+## `0_setup.py` — Environment verification
+
+**What it does:** Checks that your environment is ready before you run any other script. It verifies Python version (≥ 3.9), required packages and their minimum versions, available disk space (≥ 1 GB), internet connectivity to subwaydata.nyc, and that the expected output directories exist (creating them if not).
+
+**Why this step matters:** The download script fetches several hundred megabytes of data and the analysis script has strict version dependencies. Running the setup check first surfaces any environment problems before they cause a confusing failure partway through a long-running step. All checks print `[OK]` or `[WARN]`/`[FAIL]`; a failing check exits with code 1.
+
+**How to run:**
+```bash
+python3 0_setup.py
+```
 
 ---
 
@@ -152,6 +176,19 @@ The **weekend charts** serve a specific analytical purpose. Since the swap is we
 
 ---
 
+## `test_scripts.py` — Automated output verification
+
+**What it does:** Runs a suite of checks after `3_analyze.py` and `4_community_output.py` have completed. It verifies that the expected output files exist, that direction conventions are correct (N = northbound, S = southbound), that headway values fall within the expected bounds (1–60 minutes for daytime, 1–90 minutes overnight), and that the before/after split at December 8, 2025 is clean.
+
+**When to run it:** After any re-run of the analysis pipeline, particularly if you've extended the date range or changed filtering logic. Exits 0 on full pass, 1 on any failure.
+
+**How to run:**
+```bash
+python3 test_scripts.py
+```
+
+---
+
 ## What this analysis can and cannot claim
 
 **We can claim:** Observed train headways at Roosevelt Island were significantly longer in the post-swap period than the pre-swap period, across all daytime and evening time windows, in both directions, on weekdays.
@@ -178,90 +215,32 @@ The analysis was conducted in Python using pandas, numpy, and matplotlib. No pro
 
 ## Analytics & Privacy
 
-This dashboard includes privacy-first analytics to understand usage patterns without compromising user privacy.
+The dashboard uses Streamlit's built-in analytics — no third-party tracking scripts are injected. Google Analytics and Plausible were evaluated but are not compatible with how Streamlit renders pages (custom JavaScript injection is unreliable in the Streamlit iframe environment).
 
-### What Data Is Collected?
+### What Is Collected
 
-**With Simple Logging (default — always on):**
+Streamlit Cloud records standard app usage metrics automatically. In addition, the dashboard logs structured events to stdout, which appear in Streamlit Cloud's log viewer:
+
 - Page view timestamps
 - Anonymous session ID (random UUID, not linkable to individuals)
-- Section views and scroll depth
+- Scroll depth milestones (25%, 50%, 75%, 100%)
 - Button clicks (email, GitHub, share)
 
-**NOT collected:**
-- IP addresses (fully anonymized or not transmitted)
+**Not collected:**
+- IP addresses
 - Personal information
-- Cookies (none required)
-- Cross-site tracking
-- Advertising data
+- Cookies
+- Cross-site tracking or advertising data
 
-### Where Is Data Stored?
+### How to Access Logs
 
-| Provider | Storage | Retention |
-|---|---|---|
-| Simple Logging | Streamlit Cloud logs (stdout) | Auto-deleted after 7 days |
-| Google Analytics | Google servers (GDPR-compliant) | Configurable |
-| Plausible | EU servers or self-hosted | Configurable |
-
-### How to Access Analytics
-
-**Simple Logging (default):**
-1. Go to Streamlit Cloud dashboard
+1. Go to your Streamlit Cloud dashboard
 2. Click **Manage app → Logs**
-3. Search for `[ANALYTICS]`
-
-**Google Analytics:**
-1. Go to https://analytics.google.com
-2. Select your property → view real-time or historical reports
-
-**Plausible:**
-1. Go to `https://plausible.io/your-domain`
-
-### Configuration
-
-**Simple logging — no setup required.** Logs appear automatically in Streamlit Cloud.
-
-**Google Analytics (GA4):**
-1. Create a GA4 property at https://analytics.google.com
-2. Copy your Measurement ID (`G-XXXXXXXXXX`)
-3. In Streamlit Cloud: **Settings → Secrets**, add:
-```toml
-[analytics]
-google_analytics_id = "G-XXXXXXXXXX"
-```
-4. Redeploy the app
-
-**Plausible:**
-1. Sign up at https://plausible.io and add your domain
-2. In Streamlit Cloud: **Settings → Secrets**, add:
-```toml
-[analytics]
-plausible_domain = "your-app.streamlit.app"
-```
-3. Redeploy the app
-
-See `dashboard/.streamlit/secrets.toml.example` for the full template.
+3. Filter for `[ANALYTICS]` to see structured event entries
 
 ### Privacy Compliance
 
-- ✅ **GDPR** — No PII collected; IP anonymization enabled in GA4
+- ✅ **GDPR** — No PII collected or transmitted to third parties
 - ✅ **CCPA** — No personal data sold or shared
-- ✅ **Cookie-free** — Works without tracking cookies
+- ✅ **Cookie-free** — No tracking cookies required
 - ✅ **Transparent** — All tracking code is open source in this repo
-
-### For Users: How to Opt Out
-
-- **Browser extensions:** uBlock Origin, Privacy Badger, Brave (built-in)
-- **Browser settings:** Enable "Do Not Track"; use private/incognito mode
-
-The dashboard respects all opt-out signals and functions normally without analytics.
-
-### Testing
-
-```bash
-# Run the full analytics test suite
-pytest dashboard/tests/test_analytics.py -v
-
-# Run integration tests only
-pytest dashboard/tests/test_integration.py -v -m integration
-```

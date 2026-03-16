@@ -57,6 +57,18 @@ The critical difference between subwaydata.nyc and most transit apps is **comple
 
 ---
 
+## `1b_download_extended.py` — Extended download for seasonality testing
+
+**What it does:** Downloads additional months of data not covered by `1_download.py`, serving two purposes: (1) provides a year-ago F train baseline (January–February 2025) to directly test whether winter seasonality — rather than the swap — explains the headway increase; and (2) fills any gaps left by `1_download.py` and extends the post-swap trend through the current date. Files already on disk are skipped automatically, so re-runs are safe.
+
+**Why this matters:** A legitimate question raised after the initial analysis was whether January and February are simply worse months for subway service regardless of who's running the train. By downloading January–February 2025 data (F train, same season as the post-swap period), we can run a direct year-over-year comparison. If winter conditions were the main driver, the pre-swap winter (2025) and post-swap winter (2026) should look similar. They don't — which isolates the swap as the cause.
+
+**Run order:** Run `1_download.py` first, then this script. All files land in the same `raw_data/` folder and are picked up automatically by the analysis scripts.
+
+**Estimated download:** ~130 additional days of data, roughly 260–520 MB. Allow 15–30 minutes depending on your connection.
+
+---
+
 ## `2_inspect.py` — Verifying we have the right data
 
 **What it does:** Opens one of the downloaded files and prints its contents — column names, sample rows, and a search for Roosevelt Island records. It also specifically looks for what stop IDs appear in the data.
@@ -138,9 +150,32 @@ The storm accounts for approximately 6 percentage points of the total increase i
 
 ---
 
+## `5_seasonality_analysis.py` — Ruling out winter as the cause
+
+**What it does:** Directly addresses the question of whether January and February are simply worse months for subway service in general. It runs a three-way comparison at Roosevelt Island, on weekdays only:
+
+| Period | Train | Season |
+|---|---|---|
+| Jan–Feb 2025 | F train | Winter (pre-swap) |
+| Oct–Nov 2025 | F train | Autumn (pre-swap) |
+| Jan–Feb 2026 | M train | Winter (post-swap) |
+
+**The logic:** If seasonality were driving the difference, January–February 2025 (F train, winter) and October–November 2025 (F train, autumn) should differ materially — i.e., the two pre-swap periods should look as different as the pre/post-swap comparison. If the swap is the driver, the two pre-swap periods should look similar to each other, and only the post-swap winter should look dramatically different.
+
+**Outputs** (saved to `results/seasonality/`):
+- `seasonality_summary.csv` — Full statistics table across all three periods
+- `seasonality_headways.png` — Three-period bar chart (the key visual for policymakers)
+- `seasonality_hourly.png` — 24-hour headway profile with all three periods overlaid
+- `seasonality_cdf.png` — Cumulative wait distribution showing the full distribution of waits
+- `seasonality_report.txt` — Plain-English summary written for non-technical policymakers
+
+**Run order:** Run `1_download.py`, then `1b_download_extended.py`, then `3_analyze.py`, then this script. It can also rebuild headways from `raw_data/` directly if needed.
+
+---
+
 ## `4_community_output.py` — Generating the charts
 
-**What it does:** Takes the processed headway CSV and produces eight charts and a set of talking points designed for community use.
+**What it does:** Takes `results/roosevelt_island_headways.csv` — the processed headway data produced by `3_analyze.py` — and produces eight charts and a set of talking points designed for community use. The headways CSV has been updated to incorporate the extended date range from `1b_download_extended.py`, covering January–April 2025 (year-ago baseline) and the full post-swap period through March 2026.
 
 **Chart design decisions:**
 
@@ -178,90 +213,18 @@ The analysis was conducted in Python using pandas, numpy, and matplotlib. No pro
 
 ## Analytics & Privacy
 
-This dashboard includes privacy-first analytics to understand usage patterns without compromising user privacy.
+The dashboard uses the standard analytics built into Streamlit Community Cloud. Google Analytics is not compatible with Streamlit, so we use Streamlit's built-in usage statistics instead.
 
-### What Data Is Collected?
+### What Is Collected
 
-**With Simple Logging (default — always on):**
-- Page view timestamps
-- Anonymous session ID (random UUID, not linkable to individuals)
-- Section views and scroll depth
-- Button clicks (email, GitHub, share)
-
-**NOT collected:**
-- IP addresses (fully anonymized or not transmitted)
-- Personal information
-- Cookies (none required)
-- Cross-site tracking
-- Advertising data
-
-### Where Is Data Stored?
-
-| Provider | Storage | Retention |
-|---|---|---|
-| Simple Logging | Streamlit Cloud logs (stdout) | Auto-deleted after 7 days |
-| Google Analytics | Google servers (GDPR-compliant) | Configurable |
-| Plausible | EU servers or self-hosted | Configurable |
+Streamlit Community Cloud automatically tracks basic usage metrics (page views, active users) for apps deployed on the platform. No additional tracking code has been added to this app. No personally identifiable information is collected, no cookies are set, and no cross-site tracking occurs.
 
 ### How to Access Analytics
 
-**Simple Logging (default):**
-1. Go to Streamlit Cloud dashboard
-2. Click **Manage app → Logs**
-3. Search for `[ANALYTICS]`
+1. Go to the Streamlit Community Cloud dashboard
+2. Select the app
+3. Click **Analytics** in the app management panel
 
-**Google Analytics:**
-1. Go to https://analytics.google.com
-2. Select your property → view real-time or historical reports
+### For Users
 
-**Plausible:**
-1. Go to `https://plausible.io/your-domain`
-
-### Configuration
-
-**Simple logging — no setup required.** Logs appear automatically in Streamlit Cloud.
-
-**Google Analytics (GA4):**
-1. Create a GA4 property at https://analytics.google.com
-2. Copy your Measurement ID (`G-XXXXXXXXXX`)
-3. In Streamlit Cloud: **Settings → Secrets**, add:
-```toml
-[analytics]
-google_analytics_id = "G-XXXXXXXXXX"
-```
-4. Redeploy the app
-
-**Plausible:**
-1. Sign up at https://plausible.io and add your domain
-2. In Streamlit Cloud: **Settings → Secrets**, add:
-```toml
-[analytics]
-plausible_domain = "your-app.streamlit.app"
-```
-3. Redeploy the app
-
-See `dashboard/.streamlit/secrets.toml.example` for the full template.
-
-### Privacy Compliance
-
-- ✅ **GDPR** — No PII collected; IP anonymization enabled in GA4
-- ✅ **CCPA** — No personal data sold or shared
-- ✅ **Cookie-free** — Works without tracking cookies
-- ✅ **Transparent** — All tracking code is open source in this repo
-
-### For Users: How to Opt Out
-
-- **Browser extensions:** uBlock Origin, Privacy Badger, Brave (built-in)
-- **Browser settings:** Enable "Do Not Track"; use private/incognito mode
-
-The dashboard respects all opt-out signals and functions normally without analytics.
-
-### Testing
-
-```bash
-# Run the full analytics test suite
-pytest dashboard/tests/test_analytics.py -v
-
-# Run integration tests only
-pytest dashboard/tests/test_integration.py -v -m integration
-```
+No opt-out is required — the app sets no tracking cookies and collects no personal data beyond what Streamlit Community Cloud records by default for all hosted apps.

@@ -164,6 +164,85 @@ The **weekend charts** serve a specific analytical purpose. Since the swap is we
 
 ---
 
+## `6_analyze_63rd_st_line.py` — Confirming the degradation at all three stations
+
+**What it does:** Extends the Roosevelt Island analysis to all three stations on the 63rd Street line — 21 St-Queensbridge (B04), Roosevelt Island (B06), and Lexington Av/63 St (B08) — and confirms that headway degradation is identical at all three. A route filter (F/FX pre-swap, M post-swap) is applied at every station to isolate the 63rd Street line service. This is especially important at B08, which is also served by the Q train; without the filter, Q arrivals would artificially compress measured headways there.
+
+**Why this matters:** After applying the route filter, arrival counts at all three stations are within 1% of each other in every time bucket and direction. Median headways vary by at most 0.1–0.2 minutes across stations — which is expected, since the same physical trains stop at B04, B06, and B08 sequentially with no branching. The three-station agreement is independent methodological validation: it rules out the possibility that Roosevelt Island's numbers are a station-specific data artifact. The degradation is a line-level service change.
+
+**Run order:** Run `1_download.py` and `1b_download_extended.py` first. This script is otherwise standalone — it does not depend on `3_analyze.py`.
+
+**Outputs** (saved to `results/63rd_st_line/`):
+- `63rd_st_headways.csv` — headway records for all three stations
+- `63rd_st_summary.csv` — median/p90 before vs. after by station
+- `63rd_st_comparison_southbound.png`, `63rd_st_comparison_northbound.png` — side-by-side bar charts for each direction
+- `63rd_st_daily_trend.png` — daily rolling median over time, all three stations overlaid
+- `63rd_st_report.txt` — plain-English findings
+
+---
+
+## `7_analyze_m_train_frequency.py` — Measuring the MTA's promised 6-minute headway
+
+**What it does:** Directly tests whether the MTA delivered the enhanced M train service it committed to in its September 2025 Staff Summary. That document promised that adding extra peak M trains would bring headways to 6.0 minutes, limiting the wait time increase to approximately one minute over the F train's 4.0-minute headways. This script compares actual post-swap M train headways at Roosevelt Island against that 6.0-minute benchmark, and tracks whether service has improved month by month since the swap.
+
+**Why this matters:** The MTA made two distinct commitments: (1) the overall wait time increase would be about one minute, and (2) it would add M trains to achieve 6-minute headways. Script 7 tests the second commitment. Actual post-swap headways at Roosevelt Island have run approximately 8–9 minutes — roughly 30–50% above the promised level. The monthly trend data shows no meaningful improvement, suggesting the MTA has not taken corrective action.
+
+**Data source:** Uses `results/roosevelt_island_headways.csv` from `3_analyze.py` if available (faster). Falls back to rebuilding from raw archives if the CSV is not present.
+
+**Run order:** Run `1_download.py`, `1b_download_extended.py`, and `3_analyze.py` first (or just the download scripts if the fallback path is acceptable).
+
+**Outputs** (saved to `results/m_train_frequency/`):
+- `m_train_trains_per_day.csv` — average daily train counts before/after, by direction and rush window
+- `m_train_headway_stats.csv` — median/p90 headways with gap vs. MTA promise
+- `m_train_monthly_trend.csv` — monthly breakdown of M headways since the swap
+- `m_train_vs_promise.png` — bar chart: actual F (before), actual M (after), and MTA's promised 6-minute level
+- `m_train_trend_over_time.png` — monthly median headway trend with promise and pre-swap F baseline marked
+- `m_train_frequency_report.txt` — plain-English findings
+
+---
+
+## `8_analyze_queensboro_plaza.py` — Did the MTA's stated rationale hold up?
+
+**What it does:** Analyzes whether the MTA's stated reason for the swap — improving reliability at Queens Plaza by eliminating the local-to-express merge — produced measurable results. The script examines two separately named stations that are frequently confused in press coverage:
+
+1. **Queens Plaza (G21)** — the E/F/R station on the Queens Blvd express tracks, directly downstream of the merge point. Pre-swap service was E, M, and R; post-swap it became E, F, and R. Headways are computed per route, so each line's arrivals are measured independently.
+2. **Queensboro Plaza (718/R09)** — a completely separate station served by the 7, N, and W trains, included because it is routinely confused with Queens Plaza in official and press discussions. Its service was unaffected by the swap, so flat headways there serve as a negative control.
+
+**Important data quality note:** The GTFS-RT feed records M train arrivals at G21 (the Queens Plaza complex ID) pre-swap, even though the M ran on the local tracks and stopped at stations like 36 St and Steinway St before the merge point. G21 appears to function as a complex-level ID that captures arrivals from both express and local platforms. The apparent post-swap improvement in E/F combined headways at G21 is largely an artifact of the M disappearing from the feed there — not a genuine reliability gain. The R train, whose route did not change, serves as the cleanest control for actual E/F/R corridor reliability.
+
+**Run order:** Run `1_download.py` and `1b_download_extended.py` first. Standalone — no dependency on `3_analyze.py`.
+
+**Outputs** (saved to `results/queensboro/`):
+- `queensboro_headways.csv` — headway records for both stations
+- `queensboro_summary.csv` — median/p90 before vs. after by station and route
+- `queens_plaza_by_route_southbound.png`, `queens_plaza_by_route_northbound.png` — per-route headway charts at Queens Plaza
+- `queensboro_plaza_7nw.png` — 7/N/W headways at Queensboro Plaza (expected: no change)
+- `queens_plaza_long_gaps.png` — share of intervals exceeding 10 minutes per route, before/after
+- `queensboro_report.txt` — plain-English findings, including advocacy framing
+
+---
+
+## `9_analyze_systemwide_trips.py` — Did the MTA actually run more M trains?
+
+**What it does:** Tests a specific claim: that the MTA added extra M trains to compensate Roosevelt Island riders, as promised in its September 2025 Staff Summary. The naive approach — counting total M trip runs systemwide — is invalid because the swap changed the M's route entirely (from Middle Village–Essex St via Queens Blvd/6th Ave to Middle Village–57 St via the 63rd Street line). The same number of trip runs now covers a different route; systemwide counts say nothing about frequency at any particular station.
+
+The correct approach is to measure M arrivals at stations that were on the M route in **both** pre-swap and post-swap periods: Queens Blvd local stations Elmhurst Av (G13), Northern Blvd (G16), and 46 St (G18). These stations see the M in both periods, so an increase in arrivals there would indicate new trains were actually added. The R train, which shares these stations and whose route did not change, serves as an internal control: flat R arrivals confirm the corridor schedule itself is stable.
+
+**Analysis scope:** Peak hours only (6–9 AM and 4–7 PM), consistent with the MTA's own framing of its peak-hour commitment. December 2025 is excluded from all period comparisons because the swap took effect December 8, making December a split month with an uninterpretable average.
+
+**Run order:** Run `1_download.py` and `1b_download_extended.py` first. Standalone — no dependency on `3_analyze.py`.
+
+**Outputs** (saved to `results/m_train_frequency_control/`):
+- `control_station_arrivals.csv` — daily M and R peak arrivals per control station
+- `control_station_summary.csv` — before/after averages with % change
+- `control_monthly.csv` — monthly average arrivals, M and R
+- `control_arrivals_before_after.png` — bar chart: avg daily peak arrivals at each station
+- `control_arrivals_trend.png` — daily arrivals over time with 7-day rolling average
+- `control_monthly_trend.png` — monthly averages, M and R, with swap boundary marked
+- `control_stations_report.txt` — plain-English findings
+
+---
+
 ## `5_seasonality_analysis.py` — Ruling out winter as the cause
 
 **What it does:** Directly addresses the question of whether January and February are simply worse months for subway service in general. It runs a three-way comparison at Roosevelt Island, on weekdays only:

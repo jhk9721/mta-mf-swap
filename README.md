@@ -164,6 +164,29 @@ The **weekend charts** serve a specific analytical purpose. Since the swap is we
 
 ---
 
+## `5_seasonality_analysis.py` — Ruling out winter as the cause
+
+**What it does:** Directly addresses the question of whether January and February are simply worse months for subway service in general. It runs a three-way comparison at Roosevelt Island, on weekdays only:
+
+| Period | Train | Season |
+|---|---|---|
+| Jan–Feb 2025 | F train | Winter (pre-swap) |
+| Oct–Nov 2025 | F train | Autumn (pre-swap) |
+| Jan–Feb 2026 | M train | Winter (post-swap) |
+
+**The logic:** If seasonality were driving the difference, January–February 2025 (F train, winter) and October–November 2025 (F train, autumn) should differ materially — i.e., the two pre-swap periods should look as different as the pre/post-swap comparison. If the swap is the driver, the two pre-swap periods should look similar to each other, and only the post-swap winter should look dramatically different.
+
+**Outputs** (saved to `results/seasonality/`):
+- `seasonality_summary.csv` — Full statistics table across all three periods
+- `seasonality_headways.png` — Three-period bar chart (the key visual for policymakers)
+- `seasonality_hourly.png` — 24-hour headway profile with all three periods overlaid
+- `seasonality_cdf.png` — Cumulative wait distribution showing the full distribution of waits
+- `seasonality_report.txt` — Plain-English summary written for non-technical policymakers
+
+**Run order:** Run `1_download.py`, then `1b_download_extended.py`, then `3_analyze.py`, then this script. It can also rebuild headways from `raw_data/` directly if needed.
+
+---
+
 ## `6_analyze_63rd_st_line.py` — Confirming the degradation at all three stations
 
 **What it does:** Extends the Roosevelt Island analysis to all three stations on the 63rd Street line — 21 St-Queensbridge (B04), Roosevelt Island (B06), and Lexington Av/63 St (B08) — and confirms that headway degradation is identical at all three. A route filter (F/FX pre-swap, M post-swap) is applied at every station to isolate the 63rd Street line service. This is especially important at B08, which is also served by the Q train; without the filter, Q arrivals would artificially compress measured headways there.
@@ -240,29 +263,6 @@ The correct approach is to measure M arrivals at stations that were on the M rou
 - `control_arrivals_trend.png` — daily arrivals over time with 7-day rolling average
 - `control_monthly_trend.png` — monthly averages, M and R, with swap boundary marked
 - `control_stations_report.txt` — plain-English findings
-
----
-
-## `5_seasonality_analysis.py` — Ruling out winter as the cause
-
-**What it does:** Directly addresses the question of whether January and February are simply worse months for subway service in general. It runs a three-way comparison at Roosevelt Island, on weekdays only:
-
-| Period | Train | Season |
-|---|---|---|
-| Jan–Feb 2025 | F train | Winter (pre-swap) |
-| Oct–Nov 2025 | F train | Autumn (pre-swap) |
-| Jan–Feb 2026 | M train | Winter (post-swap) |
-
-**The logic:** If seasonality were driving the difference, January–February 2025 (F train, winter) and October–November 2025 (F train, autumn) should differ materially — i.e., the two pre-swap periods should look as different as the pre/post-swap comparison. If the swap is the driver, the two pre-swap periods should look similar to each other, and only the post-swap winter should look dramatically different.
-
-**Outputs** (saved to `results/seasonality/`):
-- `seasonality_summary.csv` — Full statistics table across all three periods
-- `seasonality_headways.png` — Three-period bar chart (the key visual for policymakers)
-- `seasonality_hourly.png` — 24-hour headway profile with all three periods overlaid
-- `seasonality_cdf.png` — Cumulative wait distribution showing the full distribution of waits
-- `seasonality_report.txt` — Plain-English summary written for non-technical policymakers
-
-**Run order:** Run `1_download.py`, then `1b_download_extended.py`, then `3_analyze.py`, then this script. It can also rebuild headways from `raw_data/` directly if needed.
 
 ---
 

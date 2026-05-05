@@ -11,7 +11,9 @@ Downloads CSV data from subwaydata.nyc for months not covered by
     - April 2025      <- optional: extends trend window
     - February 2026   <- gap fill (1_download.py may have cut off at Feb 15;
                          files already on disk are skipped automatically)
-    - March 2026      <- post-swap trend through today (Mar 12, 2026)
+    - March 2026      <- post-swap trend
+    - April 2026      <- post-swap trend
+    - May 2026        <- post-swap trend through May 4, 2026
 
   ALREADY downloaded by 1_download.py (not re-downloaded here):
     - October 2025, November 2025, December 2025  (pre-swap)
@@ -24,7 +26,7 @@ WHY THIS MATTERS:
      that directly.
   2. Gap fill: subwaydata.nyc data may not have been available past Feb 15
      when 1_download.py was last run. This script completes the picture
-     through today.
+     through May 4, 2026.
 
 HOW TO RUN:
   1. Run 1_download.py first if you haven't already.
@@ -36,8 +38,8 @@ HOW TO RUN:
      the new data.
 
 ESTIMATED DOWNLOAD:
-  ~130 days of new data -> roughly 260-520 MB compressed.
-  Allow 15-30 minutes depending on your connection.
+  ~190 days of new data -> roughly 380-760 MB compressed.
+  Allow 20-40 minutes depending on your connection.
   Files already on disk are skipped, so re-runs are safe.
 """
 
@@ -50,6 +52,9 @@ from datetime import date, timedelta
 
 OUTPUT_DIR = "raw_data"   # Same folder as 1_download.py — intentional.
 
+# Download through this date (inclusive).
+END_DATE = date(2026, 5, 4)
+
 # Months to download. Files already on disk are skipped automatically.
 MONTHS = [
     (2025,  1),   # January 2025   ← year-ago F train baseline (seasonality)
@@ -57,7 +62,9 @@ MONTHS = [
     (2025,  3),   # March 2025     ← optional: extends trend window
     (2025,  4),   # April 2025     ← optional: extends trend window
     (2026,  2),   # February 2026  ← completes Feb (1_download.py may have cut off at Feb 15)
-    (2026,  3),   # March 2026     ← post-swap trend through today (Mar 12)
+    (2026,  3),   # March 2026     ← post-swap trend
+    (2026,  4),   # April 2026     ← post-swap trend
+    (2026,  5),   # May 2026       ← post-swap trend through May 4
 ]
 
 BASE_URL = "https://subwaydata.nyc/data"
@@ -65,10 +72,10 @@ BASE_URL = "https://subwaydata.nyc/data"
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def get_all_dates(year: int, month: int) -> list:
-    """Return every date in the given year/month."""
+    """Return every date in the given year/month, up to END_DATE (inclusive)."""
     d = date(year, month, 1)
     dates = []
-    while d.month == month:
+    while d.month == month and d <= END_DATE:
         dates.append(d)
         d += timedelta(days=1)
     return dates
@@ -115,7 +122,7 @@ def main():
     print(f"Saving files to: {os.path.abspath(OUTPUT_DIR)}\n")
     print("Purpose: (1) Jan/Feb 2025 baseline for seasonality test")
     print("         (2) Fill Feb 16-28 2026 gap from 1_download.py")
-    print("         (3) Extend post-swap trend through Mar 12, 2026\n")
+    print(f"         (3) Extend post-swap trend through {END_DATE.strftime('%b %-d, %Y')}\n")
 
     downloaded, skipped, missing, failed = 0, 0, 0, 0
     total_dates = 0
@@ -130,7 +137,9 @@ def main():
             (2025, 3): "extended trend window",
             (2025, 4): "extended trend window",
             (2026, 2): "gap fill (complete Feb 2026)",
-            (2026, 3): "post-swap trend through today",
+            (2026, 3): "post-swap trend",
+            (2026, 4): "post-swap trend",
+            (2026, 5): f"post-swap trend through {END_DATE.strftime('%-d %b %Y')}",
         }.get((year, month), "")
         print(f"── {month_label}  [{purpose}]  ({len(dates)} days) ──────────")
         for d in dates:
@@ -159,8 +168,8 @@ def main():
         print(f"\n  [WARN] Low coverage ({coverage:.0f}%). "
               "Seasonality results may be unreliable.")
     if coverage >= 80:
-        print(f"\n  Ready for seasonality analysis.")
-        print(f"  Next step: python3 5_seasonality_analysis.py")
+        print(f"\n  Ready for analysis.")
+        print(f"  Next steps: python3 3_analyze.py && python3 5_seasonality_analysis.py")
 
 
 if __name__ == "__main__":

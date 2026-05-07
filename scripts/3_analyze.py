@@ -23,13 +23,17 @@ HOW TO RUN:
     python3 3_analyze.py
 
 OUTPUTS (saved to results/ folder):
-  - roosevelt_island_headways.csv
-  - headway_summary.csv
+  - roosevelt_island_headways.csv         — every headway observation
+  - headway_summary.csv                   — summary + wait time (E[H]/2) + tails
+  - headway_summary_clean_days.csv        — same summary, no holidays/storm
+  - headway_per_hour.csv                  — per-hour weekday comparison
+  - headway_monthly.csv                   — monthly stratification, peaks
+  - headway_bootstrap_ci.csv              — 95% CIs on pre→post deltas
   - headway_distribution_weekday.png
   - headway_distribution_weekend.png
   - headways_over_time.png
   - hourly_headways.png
-  - results_report.txt
+  - results_report.txt                    — extended with rebuttal sections
 """
 
 import os
@@ -55,13 +59,24 @@ RESULTS_DIR  = "results"
 # Roosevelt Island — confirmed from MTA official GTFS station glossary
 ROOSEVELT_ISLAND_STOP_IDS = {"B06N", "B06S"}
 
-SWAP_DATE  = date(2025, 12, 8)
-STORM_DATE = date(2026, 1, 25)   # January blizzard — major service disruption
+SWAP_DATE       = date(2025, 12, 8)
+STORM_DATE      = date(2026, 1, 25)   # January blizzard — major service disruption
+STORM_END_DATE  = date(2026, 2, 1)    # One-week disruption window after storm
+STEADY_START    = date(2026, 2, 1)    # "Steady-state" stratum begins
+N_BOOTSTRAP     = 1000
+BOOTSTRAP_SEED  = 42
 
-# Holiday periods: weeks where reduced ridership may affect headway patterns
+# Holiday periods: dates where reduced ridership or service exceptions may
+# affect headway patterns. The list below matches the canonical filter used
+# by script 8 (Queens Plaza analysis), so downstream comparisons (notably
+# the difference-in-differences in script 11) apply identical date exclusions
+# to treatment and control data.
 HOLIDAY_PERIODS = [
-    (date(2025, 12, 22), date(2026, 1, 5)),   # Christmas / New Year
-    (date(2026, 1, 19), date(2026, 1, 19)),    # MLK Day
+    (date(2025,  1, 20), date(2025,  1, 20)),   # MLK Day 2025
+    (date(2025,  2, 17), date(2025,  2, 17)),   # Presidents Day 2025
+    (date(2025, 12, 22), date(2026,  1,  5)),   # Christmas / New Year
+    (date(2026,  1, 19), date(2026,  1, 19)),   # MLK Day 2026
+    (date(2026,  1, 25), date(2026,  1, 25)),   # Jan 25 storm (already a Sunday)
 ]
 
 # ── Time bucket definitions ───────────────────────────────────────────────────
@@ -225,6 +240,17 @@ def compute_headways(df: pd.DataFrame) -> pd.DataFrame:
     return df_s
 
 
+def _add_wait_time_column(s: pd.DataFrame) -> pd.DataFrame:
+    """
+    Add wait_time_min = mean_headway / 2 — the MTA's own definition of
+    "average wait time" under the random-arrival assumption it uses in
+    the April 2026 letter. Matching their methodology lets the comparison
+    speak in their terms.
+    """
+    s["wait_time_min"] = s["mean"] / 2
+    return s
+
+
 def summarize_headways(df_hw: pd.DataFrame) -> pd.DataFrame:
     g = df_hw.groupby(["day_type", "time_bucket", "swap_period", "direction"])
     s = g["headway_min"].agg(
@@ -234,11 +260,169 @@ def summarize_headways(df_hw: pd.DataFrame) -> pd.DataFrame:
         p25=lambda x: x.quantile(0.25),
         p75=lambda x: x.quantile(0.75),
         p90=lambda x: x.quantile(0.90),
-    ).round(1).reset_index()
+        p95=lambda x: x.quantile(0.95),
+        max_gap="max",
+        pct_over_10=lambda x: (x > 10).mean() * 100,
+        pct_over_15=lambda x: (x > 15).mean() * 100,
+    ).reset_index()
+
+    s = _add_wait_time_column(s)
+
+    s = s.round({
+        "median": 2, "mean": 2, "p25": 2, "p75": 2, "p90": 2, "p95": 2,
+        "max_gap": 2, "pct_over_10": 1, "pct_over_15": 1,
+        "wait_time_min": 2,
+    })
     s["direction"] = s["direction"].map(
         {"N": "Northbound (→ Queens/Home)", "S": "Southbound (→ Manhattan)"}
     )
     return s.sort_values(["day_type", "time_bucket", "direction", "swap_period"])
+
+
+def summarize_by_hour(df_hw: pd.DataFrame,
+                       hours=range(6, 21)) -> pd.DataFrame:
+    """
+    Per-hour weekday breakdown for rush + adjacent hours.
+
+    Lets us answer the MTA on its own terms: their letter quotes "during
+    the 8 AM hour—the increase in average wait time is about 1.3 minutes."
+    This produces the matched 1-hour-vs-1-hour comparison.
+    """
+    sub = df_hw[df_hw["is_weekday"] & df_hw["hour"].isin(list(hours))]
+    if sub.empty:
+        return pd.DataFrame()
+
+    g = sub.groupby(["hour", "swap_period", "direction"])
+    s = g["headway_min"].agg(
+        n="count",
+        median="median",
+        mean="mean",
+        p90=lambda x: x.quantile(0.90),
+    ).reset_index()
+
+    s = _add_wait_time_column(s)
+
+    s = s.round({
+        "median": 2, "mean": 2, "p90": 2, "wait_time_min": 2,
+    })
+    s["direction"] = s["direction"].map(
+        {"N": "Northbound (→ Queens/Home)", "S": "Southbound (→ Manhattan)"}
+    )
+    return s.sort_values(["direction", "hour", "swap_period"])
+
+
+def summarize_by_month(df_hw: pd.DataFrame) -> pd.DataFrame:
+    """
+    Monthly stratification — addresses the MTA's "early months were noisy"
+    framing. Lets us point to Feb/Mar 2026 as the steady-state read.
+
+    Scope: weekday, peak hours (AM + PM rush), Southbound + Northbound.
+    """
+    sub = df_hw[
+        df_hw["is_weekday"] &
+        df_hw["time_bucket"].str[:2].isin({"2:", "4:"})
+    ].copy()
+    if sub.empty:
+        return pd.DataFrame()
+
+    sub["arrival_month"] = (
+        pd.to_datetime(sub["arrival_date"]).dt.to_period("M").astype(str)
+    )
+
+    g = sub.groupby(["arrival_month", "direction", "swap_period"])
+    s = g["headway_min"].agg(
+        n="count",
+        median="median",
+        mean="mean",
+        p90=lambda x: x.quantile(0.90),
+    ).reset_index()
+
+    s = _add_wait_time_column(s)
+
+    s = s.round({
+        "median": 2, "mean": 2, "p90": 2, "wait_time_min": 2,
+    })
+    s["direction"] = s["direction"].map(
+        {"N": "Northbound (→ Queens/Home)", "S": "Southbound (→ Manhattan)"}
+    )
+    return s.sort_values(["direction", "arrival_month"])
+
+
+def filter_clean_days(df_hw: pd.DataFrame) -> pd.DataFrame:
+    """
+    Exclude (a) holiday weeks and (b) the storm disruption window.
+    Used for the steady-state side-by-side variant — addresses the MTA's
+    "first months were affected by systemwide incidents and historic
+    winter storms" defense.
+    """
+    in_storm = (
+        (df_hw["arrival_date"] >= STORM_DATE) &
+        (df_hw["arrival_date"] <  STORM_END_DATE)
+    )
+    return df_hw[~df_hw["is_holiday_week"] & ~in_storm]
+
+
+def bootstrap_pre_post_ci(df_hw: pd.DataFrame,
+                            n_boot: int = N_BOOTSTRAP,
+                            seed: int = BOOTSTRAP_SEED) -> pd.DataFrame:
+    """
+    Bootstrap 95% confidence intervals on the pre→post delta for:
+      - median headway
+      - wait time = mean headway / 2  (the MTA's own definition)
+
+    Reports per (time_bucket, direction) on weekdays. The CI lets us state
+    "+1.5 min, 95% CI [1.3, 1.7]" against the MTA's projected ~1.0 min and
+    show whether the gap is statistically distinguishable.
+
+    Min sample requirement: 30 in each of pre and post; otherwise skipped.
+    """
+    rng = np.random.default_rng(seed)
+    rows = []
+
+    # Apply the same is_holiday_week filter that downstream comparisons
+    # (script 11 DiD) use, so the bootstrap CI and the DiD report identical
+    # treatment-side numbers.
+    sub = df_hw[df_hw["is_weekday"] & ~df_hw["is_holiday_week"]]
+    for (bucket, direction), grp in sub.groupby(["time_bucket", "direction"]):
+        pre  = grp[grp["swap_period"] == "Before swap"]["headway_min"].to_numpy()
+        post = grp[grp["swap_period"] == "After swap" ]["headway_min"].to_numpy()
+        if len(pre) < 30 or len(post) < 30:
+            continue
+
+        med_deltas  = np.empty(n_boot)
+        wait_deltas = np.empty(n_boot)
+        for i in range(n_boot):
+            ps = rng.choice(pre,  size=len(pre),  replace=True)
+            qs = rng.choice(post, size=len(post), replace=True)
+            med_deltas[i]  = np.median(qs) - np.median(ps)
+            wait_deltas[i] = qs.mean() / 2 - ps.mean() / 2
+
+        wait_pre  = pre.mean()  / 2
+        wait_post = post.mean() / 2
+
+        rows.append({
+            "time_bucket":      bucket,
+            "direction":        direction,
+            "n_pre":            int(len(pre)),
+            "n_post":           int(len(post)),
+            "median_pre":       round(float(np.median(pre)), 2),
+            "median_post":      round(float(np.median(post)), 2),
+            "median_delta":     round(float(np.median(post) - np.median(pre)), 2),
+            "median_delta_ci_low":  round(float(np.percentile(med_deltas, 2.5)), 2),
+            "median_delta_ci_high": round(float(np.percentile(med_deltas, 97.5)), 2),
+            "wait_time_pre":    round(float(wait_pre), 2),
+            "wait_time_post":   round(float(wait_post), 2),
+            "wait_time_delta":  round(float(wait_post - wait_pre), 2),
+            "wait_time_delta_ci_low":  round(float(np.percentile(wait_deltas, 2.5)), 2),
+            "wait_time_delta_ci_high": round(float(np.percentile(wait_deltas, 97.5)), 2),
+        })
+
+    df = pd.DataFrame(rows)
+    if not df.empty:
+        df["direction"] = df["direction"].map(
+            {"N": "Northbound (→ Queens/Home)", "S": "Southbound (→ Manhattan)"}
+        )
+    return df
 
 
 def verify_direction_convention(df: pd.DataFrame) -> None:
@@ -651,7 +835,93 @@ def plot_daily_median_headway(df_hw: pd.DataFrame, results_dir: str):
     print(f"Saved: {path}")
 
 
-def write_report(df_hw: pd.DataFrame, summary: pd.DataFrame, results_dir: str):
+def _format_hour_block(by_hour: pd.DataFrame, direction_label: str) -> list:
+    """Render the per-hour comparison for a direction as report lines."""
+    lines = []
+    if by_hour.empty:
+        return ["  (per-hour data unavailable)"]
+    sub = by_hour[by_hour["direction"] == direction_label].copy()
+    if sub.empty:
+        return ["  (no rows for direction " + direction_label + ")"]
+
+    lines.append(
+        f"  Hour | n(pre)/n(post) |   median (min)   |  wait = E[H]/2  | wait Δ"
+    )
+    lines.append("  " + "-" * 70)
+    for hour in sorted(sub["hour"].unique()):
+        pre  = sub[(sub["hour"] == hour) & (sub["swap_period"] == "Before swap")]
+        post = sub[(sub["hour"] == hour) & (sub["swap_period"] == "After swap")]
+        if pre.empty or post.empty:
+            continue
+        n_pre  = int(pre["n"].values[0])
+        n_post = int(post["n"].values[0])
+        m_pre  = pre["median"].values[0]
+        m_post = post["median"].values[0]
+        w_pre  = pre["wait_time_min"].values[0]
+        w_post = post["wait_time_min"].values[0]
+        delta_w = w_post - w_pre
+        h12 = (hour - 12) if hour > 12 else hour
+        am_pm = "PM" if hour >= 12 else "AM"
+        h12 = 12 if h12 == 0 else h12
+        lines.append(
+            f"  {hour:>2} ({h12:>2} {am_pm}) | {n_pre:>5,}/{n_post:<5,} "
+            f"|  {m_pre:>4.2f} → {m_post:>4.2f}  "
+            f"|  {w_pre:>4.2f} → {w_post:>4.2f}  | {delta_w:+.2f}"
+        )
+    return lines
+
+
+def _format_bootstrap_block(boot: pd.DataFrame, direction_label: str) -> list:
+    """Render bootstrap CI comparison for a direction as report lines."""
+    if boot.empty:
+        return ["  (bootstrap data unavailable)"]
+    sub = boot[boot["direction"] == direction_label]
+    if sub.empty:
+        return ["  (no rows for direction " + direction_label + ")"]
+
+    lines = []
+    lines.append(f"  {'Bucket':<32} | median Δ (95% CI)         | wait Δ (E[H]/2, 95% CI)")
+    lines.append("  " + "-" * 80)
+    for _, r in sub.sort_values("time_bucket").iterrows():
+        lines.append(
+            f"  {r['time_bucket']:<32} | "
+            f"{r['median_delta']:+.2f} [{r['median_delta_ci_low']:+.2f}, "
+            f"{r['median_delta_ci_high']:+.2f}]  | "
+            f"{r['wait_time_delta']:+.2f} [{r['wait_time_delta_ci_low']:+.2f}, "
+            f"{r['wait_time_delta_ci_high']:+.2f}]"
+        )
+    return lines
+
+
+def _format_monthly_block(monthly: pd.DataFrame, direction_label: str) -> list:
+    """Render monthly stratification for a direction as report lines."""
+    if monthly.empty:
+        return ["  (monthly data unavailable)"]
+    sub = monthly[monthly["direction"] == direction_label].copy()
+    if sub.empty:
+        return ["  (no rows for direction " + direction_label + ")"]
+
+    lines = []
+    lines.append(
+        f"  Month   | period       |    n   | median | wait = E[H]/2"
+    )
+    lines.append("  " + "-" * 60)
+    for _, r in sub.sort_values("arrival_month").iterrows():
+        lines.append(
+            f"  {r['arrival_month']} | {r['swap_period']:<12} | "
+            f"{int(r['n']):>5,} | {r['median']:>5.2f}  | {r['wait_time_min']:>5.2f}"
+        )
+    return lines
+
+
+def write_report(df_hw: pd.DataFrame,
+                  summary: pd.DataFrame,
+                  results_dir: str,
+                  *,
+                  summary_clean: pd.DataFrame | None = None,
+                  by_hour: pd.DataFrame | None = None,
+                  monthly: pd.DataFrame | None = None,
+                  boot: pd.DataFrame | None = None):
 
     def med(day_type, bucket_prefix, direction, swap):
         sub = df_hw[
@@ -761,10 +1031,81 @@ All periods: F train both before and after swap.
   Before: median {med('Weekend','5:','N','Before swap')} min | After: {med('Weekend','5:','N','After swap')} min | Change: {chg('Weekend','5:','N')}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-FULL STATISTICS TABLE
+FULL STATISTICS TABLE  (median, mean, tails, MTA-style wait time)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Columns: wait_time_min = mean_headway / 2 — the MTA's own definition of
+                          "average wait time" used in the April 2026 letter.
+         pct_over_10   = % of headway intervals exceeding 10 minutes
 {summary.to_string(index=False)}
 """
+
+    extra_lines = []
+    if boot is not None and not boot.empty:
+        extra_lines += [
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"BOOTSTRAP CIs ON PRE→POST DELTAS  ({N_BOOTSTRAP} resamples, 95% CI)",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "  Tests whether the realized increase is distinguishable from MTA's",
+            "  September 2025 commitment of ~1 minute additional wait.",
+            "",
+            "  Southbound (→ Manhattan, AM commute):",
+        ]
+        extra_lines += _format_bootstrap_block(boot, "Southbound (→ Manhattan)")
+        extra_lines += ["", "  Northbound (→ Queens):"]
+        extra_lines += _format_bootstrap_block(boot, "Northbound (→ Queens/Home)")
+        extra_lines += [""]
+
+    # ── Per-hour section ────────────────────────────────────────────────
+    if by_hour is not None and not by_hour.empty:
+        extra_lines += [
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "PER-HOUR COMPARISON (matched 1-hr windows; weekday only)",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "  Lets us answer the MTA on its own terms — their letter cites",
+            "  \"during the 8 AM hour—the increase in average wait is about 1.3",
+            "  minutes.\" Here is each rush + adjacent hour, weekday, both",
+            "  directions, with median headway and MTA-style wait = E[H]/2.",
+            "",
+            "  Southbound (→ Manhattan):",
+        ]
+        extra_lines += _format_hour_block(by_hour, "Southbound (→ Manhattan)")
+        extra_lines += ["", "  Northbound (→ Queens/Home):"]
+        extra_lines += _format_hour_block(by_hour, "Northbound (→ Queens/Home)")
+        extra_lines += [""]
+
+    # ── Monthly stratification section ───────────────────────────────────
+    if monthly is not None and not monthly.empty:
+        extra_lines += [
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "MONTHLY STRATIFICATION — STEADY STATE vs SHAKEDOWN",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "  The MTA letter argues that \"the first months of the new service",
+            "  pattern were affected by systemwide incidents and historic winter",
+            "  storms.\" This breakdown shows weekday peak headways month by",
+            "  month so the steady-state period (Feb-Mar 2026, post-storm) can",
+            "  speak for itself.",
+            "",
+            "  Southbound (→ Manhattan):",
+        ]
+        extra_lines += _format_monthly_block(monthly, "Southbound (→ Manhattan)")
+        extra_lines += ["", "  Northbound (→ Queens/Home):"]
+        extra_lines += _format_monthly_block(monthly, "Northbound (→ Queens/Home)")
+        extra_lines += [""]
+
+    # ── Clean-days side-by-side ──────────────────────────────────────────
+    if summary_clean is not None and not summary_clean.empty:
+        extra_lines += [
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "CLEAN-DAYS VARIANT (excludes holiday weeks + Jan 25–Jan 31 storm)",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "  Same summary as above, restricted to non-holiday non-storm",
+            "  weekdays. Closes the MTA's \"early months were noisy\" loophole.",
+            "",
+            summary_clean.to_string(index=False),
+            "",
+        ]
+
+    report = report + "\n".join(extra_lines)
 
     path = os.path.join(results_dir, "results_report.txt")
     with open(path, "w") as f:
@@ -804,12 +1145,40 @@ def main():
     analyze_holiday_impact(df_hw)
     analyze_weekend_control_group(df_hw)
 
+    # ── Phase 2b: Methodology rebuttals to MTA letter ────────────────────
+    print("── Per-hour weekday comparison (rush + adjacent) ───────────────")
+    by_hour = summarize_by_hour(df_hw)
+    by_hour.to_csv(os.path.join(RESULTS_DIR, "headway_per_hour.csv"), index=False)
+    print(by_hour.to_string(index=False)); print()
+
+    print("── Monthly stratification (peak hours, weekday) ────────────────")
+    monthly = summarize_by_month(df_hw)
+    monthly.to_csv(os.path.join(RESULTS_DIR, "headway_monthly.csv"), index=False)
+    print(monthly.to_string(index=False)); print()
+
+    print(f"── Bootstrap pre/post CIs ({N_BOOTSTRAP} resamples) ────────────────────")
+    boot = bootstrap_pre_post_ci(df_hw)
+    boot.to_csv(os.path.join(RESULTS_DIR, "headway_bootstrap_ci.csv"), index=False)
+    print(boot.to_string(index=False)); print()
+
+    print("── Clean-days variant (no holiday weeks, no storm window) ──────")
+    df_hw_clean = filter_clean_days(df_hw)
+    summary_clean = summarize_headways(df_hw_clean)
+    summary_clean.to_csv(
+        os.path.join(RESULTS_DIR, "headway_summary_clean_days.csv"), index=False
+    )
+    print(f"  Clean days: {df_hw_clean['arrival_date'].nunique()} of "
+          f"{df_hw['arrival_date'].nunique()} weekdays retained.")
+    print(summary_clean.to_string(index=False)); print()
+
     # ── Phase 3: Charts + report ─────────────────────────────────────────
     plot_distribution(df_hw, "Weekday", RESULTS_DIR)
     plot_distribution(df_hw, "Weekend", RESULTS_DIR)
     plot_hourly_headways(df_hw, RESULTS_DIR)
     plot_daily_median_headway(df_hw, RESULTS_DIR)
-    write_report(df_hw, summary, RESULTS_DIR)
+    write_report(df_hw, summary, RESULTS_DIR,
+                  summary_clean=summary_clean, by_hour=by_hour,
+                  monthly=monthly, boot=boot)
 
     print(f"\nAll results saved to: {os.path.abspath(RESULTS_DIR)}/")
 

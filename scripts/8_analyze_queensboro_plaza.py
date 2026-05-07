@@ -53,11 +53,15 @@ HOW TO RUN:
     python3 8_analyze_queensboro_plaza.py
 
 OUTPUTS (saved to results/queensboro/):
-  - queensboro_headways.csv          — headway records for both stations
-  - queensboro_summary.csv           — median/p90 before vs. after
-  - queens_plaza_ef_comparison.png   — E/F headways at Queens Plaza before/after
-  - queensboro_plaza_7nw.png         — 7/N/W headways (should show no change)
-  - queensboro_report.txt            — plain-English findings
+  - queensboro_headways.csv                      — headway records for both stations
+  - queensboro_summary.csv                       — median/p90 before vs. after
+  - queensboro_long_gaps.csv                     — % intervals > 10/15 min by route
+  - queens_plaza_mta_baseline.csv                — MTA Staff Summary 15–20% claim test
+  - queens_plaza_by_route_*.png                  — E/M/F/R headways at Queens Plaza
+  - queens_plaza_long_gaps.png                   — long-gap rates by route
+  - queens_plaza_mta_baseline_comparison.png     — Sept 2025 claim vs realized data
+  - queensboro_plaza_7nw.png                     — 7/N/W headways (should show no change)
+  - queensboro_report.txt                        — plain-English findings
 """
 
 import os
@@ -321,6 +325,128 @@ def compute_headways(df: pd.DataFrame) -> pd.DataFrame:
     print(f"  Outlier removal: {total_removed} records removed")
     print(f"  {len(df_s):,} headway observations retained.\n")
     return df_s
+
+
+def _combined_stream_headways(df_arrivals: pd.DataFrame,
+                                routes: list,
+                                period: str | None = None) -> pd.Series:
+    """
+    Compute headways treating the listed routes as a single arrival stream
+    at Queens Plaza, peak hours (AM bucket "2:" + PM bucket "4:"), weekday.
+
+    This is the rider's-eye view: how long until ANY E/M/R (or E/F/R) train
+    arrives, ignoring which route. The MTA's "15-20% delayed at Queens Plaza"
+    framing is a combined-stream claim, not per-route.
+    """
+    sub = df_arrivals[
+        (df_arrivals["station_group"] == "Queens Plaza") &
+        df_arrivals["route_group"].isin(routes) &
+        df_arrivals["time_bucket"].str[:2].isin({"2:", "4:"})
+    ]
+    if period is not None:
+        sub = sub[sub["swap_period"] == period]
+    if sub.empty:
+        return pd.Series(dtype=float)
+    sub = sub.sort_values(
+        ["arrival_date", "direction", "time_bucket", "arrival_dt"]
+    ).copy()
+    grp = ["arrival_date", "direction", "time_bucket"]
+    sub["prev"] = sub.groupby(grp)["arrival_dt"].shift(1)
+    sub["headway_min"] = (
+        (sub["arrival_dt"] - sub["prev"]).dt.total_seconds() / 60
+    )
+    sub = sub.dropna(subset=["headway_min"])
+    sub = sub[(sub["headway_min"] >= 1) & (sub["headway_min"] <= 60)]
+    return sub["headway_min"]
+
+
+def compute_mta_baseline_test(df_arrivals: pd.DataFrame,
+                                df_hw: pd.DataFrame) -> tuple:
+    """
+    Tests the MTA's September 2025 Staff Summary claim:
+      "Approximately 15-20% of rush hour E/M/R trains are delayed
+       at Queens Plaza."
+
+    For each (period × scope) cell, computes:
+      - n_intervals
+      - median headway (min)
+      - % of headway intervals exceeding fixed thresholds (5, 7, 10, 15 min)
+      - % exceeding 1.5x and 2x the anchor (pre-swap E+M+R combined median),
+        as transparent proxies for "delayed" without GTFS static schedule data
+
+    Scopes:
+      - "E+M+R combined" pre-swap (matches MTA framing)
+      - "E+F+R combined" post-swap (mirror — what the swap delivered)
+      - Each individual route within its served period (E, M, F, R)
+
+    Filters (already applied upstream): weekday, non-holiday.
+    Station: Queens Plaza (G21). Hours: AM peak + PM peak combined.
+
+    Returns:
+      (results_df, anchor_median_min)
+    """
+    print("Computing MTA Staff Summary baseline test (Queens Plaza, peak hours)...")
+
+    # Combined-stream headways
+    pre_emr  = _combined_stream_headways(df_arrivals, ["E", "M", "R"], "Before swap")
+    post_efr = _combined_stream_headways(df_arrivals, ["E", "F", "R"], "After swap")
+
+    # Anchor: pre-swap E+M+R combined median in peak hours
+    anchor_median = pre_emr.median() if not pre_emr.empty else float("nan")
+    anchor_1_5x   = anchor_median * 1.5 if pd.notna(anchor_median) else float("nan")
+    anchor_2x     = anchor_median * 2.0 if pd.notna(anchor_median) else float("nan")
+
+    # Per-route headways from df_hw, restricted to QP peak hours
+    qp_hw_peak = df_hw[
+        (df_hw["station_group"] == "Queens Plaza") &
+        df_hw["time_bucket"].str[:2].isin({"2:", "4:"})
+    ]
+
+    def _row(period: str, scope: str, headways: pd.Series):
+        if headways is None or headways.empty:
+            return None
+
+        def pct(threshold):
+            if pd.isna(threshold):
+                return None
+            return round((headways > threshold).mean() * 100, 1)
+
+        return {
+            "period": period,
+            "scope": scope,
+            "n_intervals": int(len(headways)),
+            "median_headway_min": round(headways.median(), 2),
+            "pct_over_5min":  pct(5),
+            "pct_over_7min":  pct(7),
+            "pct_over_10min": pct(10),
+            "pct_over_15min": pct(15),
+            "pct_over_anchor_1_5x": pct(anchor_1_5x),
+            "pct_over_anchor_2x":   pct(anchor_2x),
+            "anchor_median_min":    round(anchor_median, 2) if pd.notna(anchor_median) else None,
+            "anchor_threshold_1_5x_min": round(anchor_1_5x, 2) if pd.notna(anchor_1_5x) else None,
+            "anchor_threshold_2x_min":   round(anchor_2x, 2)   if pd.notna(anchor_2x)   else None,
+        }
+
+    rows = []
+
+    # Combined-stream rows
+    rows.append(_row("Before swap", "E+M+R combined (MTA framing)", pre_emr))
+    rows.append(_row("After swap",  "E+F+R combined (post-swap mirror)", post_efr))
+
+    # Per-route rows. For F we report only post-swap; for M only pre-swap.
+    # E and R appear in both periods — R is the un-rerouted control signal.
+    for route in ["E", "M", "F", "R"]:
+        for period in ["Before swap", "After swap"]:
+            hw = qp_hw_peak[
+                (qp_hw_peak["route_group"]  == route) &
+                (qp_hw_peak["swap_period"]  == period)
+            ]["headway_min"].dropna()
+            row = _row(period, f"{route} only", hw)
+            if row is not None:
+                rows.append(row)
+
+    rows = [r for r in rows if r is not None]
+    return pd.DataFrame(rows), anchor_median
 
 
 def compute_long_gap_rates(df_hw: pd.DataFrame) -> pd.DataFrame:
@@ -742,11 +868,136 @@ def plot_long_gaps(gap_data: pd.DataFrame, out_dir: Path):
     print(f"Saved: {path}")
 
 
+def plot_mta_baseline_comparison(mta_df: pd.DataFrame,
+                                   anchor_median: float,
+                                   out_dir: Path):
+    """
+    Two-panel chart comparing the data against the MTA's Staff Summary
+    "15-20% of rush-hour E/M/R trains delayed at Queens Plaza" claim.
+
+    Top panel: Combined-stream rates — pre-swap E+M+R vs post-swap E+F+R —
+               with the 15-20% MTA baseline shaded.
+    Bottom panel: R-train-only rates pre vs post — the cleanest reliability
+               signal because R did not change routes through Queens Plaza.
+    """
+    if mta_df.empty:
+        print("  [WARN] No MTA baseline data — skipping chart.")
+        return
+
+    THRESHOLD_COLS = [
+        ("pct_over_5min",         "> 5 min"),
+        ("pct_over_7min",         "> 7 min"),
+        ("pct_over_10min",        "> 10 min"),
+        ("pct_over_15min",        "> 15 min"),
+        ("pct_over_anchor_1_5x",  f"> 1.5×\nanchor\n({anchor_median*1.5:.1f}m)"
+                                    if pd.notna(anchor_median) else "> 1.5× anchor"),
+        ("pct_over_anchor_2x",    f"> 2×\nanchor\n({anchor_median*2:.1f}m)"
+                                    if pd.notna(anchor_median) else "> 2× anchor"),
+    ]
+    threshold_keys   = [c for c, _ in THRESHOLD_COLS]
+    threshold_labels = [l for _, l in THRESHOLD_COLS]
+
+    fig, (ax_top, ax_bot) = plt.subplots(2, 1, figsize=(13, 10), sharex=False)
+    fig.suptitle(
+        "Queens Plaza — MTA Staff Summary Reliability Claim Test\n"
+        "Sept 2025 claim: \"approximately 15-20% of rush hour E/M/R trains "
+        "are delayed at Queens Plaza\"",
+        fontsize=12.5, fontweight="bold",
+    )
+
+    def _draw_panel(ax, pre_row, post_row, pre_label, post_label, title):
+        x = np.arange(len(threshold_keys))
+        width = 0.36
+
+        pre_vals  = [pre_row[k]  if pre_row  is not None and pd.notna(pre_row[k])  else 0
+                     for k in threshold_keys]
+        post_vals = [post_row[k] if post_row is not None and pd.notna(post_row[k]) else 0
+                     for k in threshold_keys]
+
+        # MTA's stated baseline band: 15-20%
+        ax.axhspan(15, 20, color="#FFE066", alpha=0.55, zorder=0,
+                    label="MTA Staff Summary baseline (15–20%)")
+
+        ax.bar(x - width/2, pre_vals,  width=width, color=COLOR_BEFORE,
+                alpha=0.85, label=pre_label,  zorder=3)
+        ax.bar(x + width/2, post_vals, width=width, color=COLOR_AFTER,
+                alpha=0.85, label=post_label, zorder=3)
+
+        for xi, v in zip(x - width/2, pre_vals):
+            if v > 0:
+                ax.text(xi, v + 0.6, f"{v:.1f}%", ha="center", va="bottom",
+                         fontsize=8.5, fontweight="bold", color=COLOR_BEFORE)
+        for xi, v in zip(x + width/2, post_vals):
+            if v > 0:
+                ax.text(xi, v + 0.6, f"{v:.1f}%", ha="center", va="bottom",
+                         fontsize=8.5, fontweight="bold", color=COLOR_AFTER)
+
+        # Sample-size annotation
+        n_pre  = pre_row["n_intervals"]  if pre_row  is not None else 0
+        n_post = post_row["n_intervals"] if post_row is not None else 0
+        ax.text(0.01, 0.97,
+                 f"n (pre)={n_pre:,}   n (post)={n_post:,}",
+                 transform=ax.transAxes, fontsize=8.5, color="#444444",
+                 va="top", ha="left",
+                 bbox=dict(boxstyle="round,pad=0.3",
+                            facecolor="white", alpha=0.85, edgecolor="#cccccc"))
+
+        ax.set_title(title, fontsize=11, fontweight="bold", pad=8)
+        ax.set_xticks(x)
+        ax.set_xticklabels(threshold_labels, fontsize=9)
+        ax.set_ylabel("% of headway intervals exceeding threshold", fontsize=9.5)
+        ax.yaxis.grid(True, linestyle="--", alpha=0.4, zorder=0)
+        ax.set_ylim(bottom=0,
+                     top=max(max(pre_vals or [0]), max(post_vals or [0]), 25) * 1.25)
+        ax.legend(fontsize=9, loc="upper right")
+
+    # Top panel: combined-stream comparison
+    pre_combined  = mta_df[mta_df["scope"] == "E+M+R combined (MTA framing)"]
+    post_combined = mta_df[mta_df["scope"] == "E+F+R combined (post-swap mirror)"]
+    _draw_panel(
+        ax_top,
+        pre_combined.iloc[0]  if not pre_combined.empty  else None,
+        post_combined.iloc[0] if not post_combined.empty else None,
+        "Pre-swap: E+M+R combined",
+        "Post-swap: E+F+R combined",
+        "Combined arrival stream — composition changed (M → F)",
+    )
+
+    # Bottom panel: R-train control
+    pre_r  = mta_df[(mta_df["scope"] == "R only") & (mta_df["period"] == "Before swap")]
+    post_r = mta_df[(mta_df["scope"] == "R only") & (mta_df["period"] == "After swap")]
+    _draw_panel(
+        ax_bot,
+        pre_r.iloc[0]  if not pre_r.empty  else None,
+        post_r.iloc[0] if not post_r.empty else None,
+        "Pre-swap: R train",
+        "Post-swap: R train",
+        "R train (route unchanged through Queens Plaza) — clean reliability signal",
+    )
+
+    fig.text(
+        0.5, -0.01,
+        "Anchor = pre-swap E+M+R combined median headway in peak hours. "
+        "Thresholds are transparent proxies for \"delayed\" — see report. | " + SOURCE_NOTE,
+        ha="center", fontsize=8, color="gray",
+    )
+
+    plt.tight_layout(rect=[0, 0.02, 1, 0.95])
+    path = out_dir / "queens_plaza_mta_baseline_comparison.png"
+    plt.savefig(path, dpi=160, bbox_inches="tight")
+    plt.close()
+    print(f"Saved: {path}")
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # REPORT
 # ══════════════════════════════════════════════════════════════════════════════
 
-def write_report(summary: pd.DataFrame, gap_data: pd.DataFrame, out_dir: Path):
+def write_report(summary: pd.DataFrame,
+                  gap_data: pd.DataFrame,
+                  mta_df: pd.DataFrame,
+                  anchor_median: float,
+                  out_dir: Path):
 
     def med(station, route_grp, bucket_prefix, direction, period):
         sub = summary[
@@ -766,6 +1017,17 @@ def write_report(summary: pd.DataFrame, gap_data: pd.DataFrame, out_dir: Path):
             (gap_data["swap_period"]   == period)
         ]
         return f"{sub['pct_over_10min'].values[0]:.1f}%" if not sub.empty else "N/A"
+
+    def mta_cell(scope: str, period: str, col: str) -> str:
+        row = mta_df[(mta_df["scope"] == scope) & (mta_df["period"] == period)]
+        if row.empty or pd.isna(row[col].values[0]):
+            return "N/A"
+        v = row[col].values[0]
+        if col.startswith("pct_") or col == "pct_over_anchor_1_5x" or col == "pct_over_anchor_2x":
+            return f"{v:.1f}%"
+        if col == "n_intervals":
+            return f"{int(v):,}"
+        return f"{v:.2f}"
 
     lines = [
         "QUEENSBORO PLAZA / QUEENS PLAZA — RELIABILITY ANALYSIS",
@@ -828,6 +1090,77 @@ def write_report(summary: pd.DataFrame, gap_data: pd.DataFrame, out_dir: Path):
         f"    7 train before:  {med('Queensboro Plaza (7/N/W)', '7/7X', '2:', 'S', 'Before swap')} min",
         f"    7 train after:   {med('Queensboro Plaza (7/N/W)', '7/7X', '2:', 'S', 'After swap')} min",
         f"    (Stable = expected; 7/N/W not affected by F/M swap)",
+        "",
+        "MTA STAFF SUMMARY CLAIM TEST",
+        "-" * 40,
+        "",
+        "  The MTA's September 2025 Staff Summary justifying the F/M Swap stated:",
+        "    \"Approximately 15-20% of rush hour E/M/R trains are delayed",
+        "     at Queens Plaza.\"",
+        "",
+        "  This was the central pre-stated success metric for the swap.",
+        "  The April 2026 letter does not revisit it.",
+        "",
+        "  PROXY METHODOLOGY:",
+        "    The MTA's internal definition of \"delayed\" is not public. We have",
+        "    arrival timestamps from GTFS-RT, not movement-delay records. To test",
+        "    the claim transparently, we report the share of headway intervals",
+        "    exceeding several thresholds — fixed (5/7/10/15 min) and relative",
+        "    to the pre-swap E+M+R combined median in peak hours (the \"anchor\").",
+        "",
+        f"    Anchor = pre-swap E+M+R combined median peak headway: "
+        f"{anchor_median:.2f} min" if pd.notna(anchor_median) else
+        "    Anchor not computed (insufficient pre-swap data).",
+        "",
+        "  COMBINED-STREAM RATES (matches MTA framing — any train at QP, peak):",
+        "",
+        f"    Pre-swap  E+M+R combined  (n = {mta_cell('E+M+R combined (MTA framing)', 'Before swap', 'n_intervals')}):",
+        f"      median headway:        {mta_cell('E+M+R combined (MTA framing)', 'Before swap', 'median_headway_min')} min",
+        f"      % > 5 min:             {mta_cell('E+M+R combined (MTA framing)', 'Before swap', 'pct_over_5min')}",
+        f"      % > 7 min:             {mta_cell('E+M+R combined (MTA framing)', 'Before swap', 'pct_over_7min')}",
+        f"      % > 10 min:            {mta_cell('E+M+R combined (MTA framing)', 'Before swap', 'pct_over_10min')}",
+        f"      % > 15 min:            {mta_cell('E+M+R combined (MTA framing)', 'Before swap', 'pct_over_15min')}",
+        f"      % > 1.5x anchor:       {mta_cell('E+M+R combined (MTA framing)', 'Before swap', 'pct_over_anchor_1_5x')}",
+        f"      % > 2x anchor:         {mta_cell('E+M+R combined (MTA framing)', 'Before swap', 'pct_over_anchor_2x')}  ← headline proxy",
+        "",
+        f"    Post-swap E+F+R combined  (n = {mta_cell('E+F+R combined (post-swap mirror)', 'After swap', 'n_intervals')}):",
+        f"      median headway:        {mta_cell('E+F+R combined (post-swap mirror)', 'After swap', 'median_headway_min')} min",
+        f"      % > 5 min:             {mta_cell('E+F+R combined (post-swap mirror)', 'After swap', 'pct_over_5min')}",
+        f"      % > 7 min:             {mta_cell('E+F+R combined (post-swap mirror)', 'After swap', 'pct_over_7min')}",
+        f"      % > 10 min:            {mta_cell('E+F+R combined (post-swap mirror)', 'After swap', 'pct_over_10min')}",
+        f"      % > 15 min:            {mta_cell('E+F+R combined (post-swap mirror)', 'After swap', 'pct_over_15min')}",
+        f"      % > 1.5x anchor:       {mta_cell('E+F+R combined (post-swap mirror)', 'After swap', 'pct_over_anchor_1_5x')}",
+        f"      % > 2x anchor:         {mta_cell('E+F+R combined (post-swap mirror)', 'After swap', 'pct_over_anchor_2x')}  ← headline proxy",
+        "",
+        "  R-TRAIN-ONLY RATES (clean reliability signal — R route unchanged):",
+        "",
+        f"    Pre-swap  R only  (n = {mta_cell('R only', 'Before swap', 'n_intervals')}):",
+        f"      median headway:        {mta_cell('R only', 'Before swap', 'median_headway_min')} min",
+        f"      % > 10 min:            {mta_cell('R only', 'Before swap', 'pct_over_10min')}",
+        f"      % > 2x anchor:         {mta_cell('R only', 'Before swap', 'pct_over_anchor_2x')}",
+        "",
+        f"    Post-swap R only  (n = {mta_cell('R only', 'After swap', 'n_intervals')}):",
+        f"      median headway:        {mta_cell('R only', 'After swap', 'median_headway_min')} min",
+        f"      % > 10 min:            {mta_cell('R only', 'After swap', 'pct_over_10min')}",
+        f"      % > 2x anchor:         {mta_cell('R only', 'After swap', 'pct_over_anchor_2x')}",
+        "",
+        "  COMPOSITIONAL CAVEAT (carry-over from script header):",
+        "    G21 functions as a complex-level GTFS-RT stop ID — pre-swap arrivals",
+        "    include E + F + M interleaved across the express and local platforms.",
+        "    Post-swap, M is rerouted off Queens Plaza, leaving E + F + R. The",
+        "    combined-stream rate above mixes a different set of routes pre vs",
+        "    post, so a drop is not purely a reliability gain (or loss). The",
+        "    R-train-only rates are the cleanest signal because R did not",
+        "    change routes.",
+        "",
+        "  HOW TO READ THIS:",
+        "    If the pre-swap E+M+R \"% > 2x anchor\" rate is in the 15-20% band,",
+        "    our data is consistent with the MTA's stated baseline and the proxy",
+        "    is calibrated. If the post-swap E+F+R rate dropped substantially AND",
+        "    the R-train-only rate also improved, the swap delivered measurable",
+        "    reliability gains. If the post-swap rate is flat or higher — or the",
+        "    R-train signal shows no improvement — then the MTA's central",
+        "    justification is not yet supported by the available data.",
         "",
         "ADVOCACY FRAMING",
         "-" * 40,
@@ -897,15 +1230,20 @@ def main():
 
     summary  = build_summary(df_hw)
     gap_data = compute_long_gap_rates(df_hw)
+    mta_df, anchor_median = compute_mta_baseline_test(df, df_hw)
 
     summary.to_csv(OUT_DIR / "queensboro_summary.csv", index=False)
     gap_data.to_csv(OUT_DIR / "queensboro_long_gaps.csv", index=False)
+    mta_df.to_csv(OUT_DIR / "queens_plaza_mta_baseline.csv", index=False)
 
     print("── Summary (rush hours, by station and route) ──────────────────")
     print(summary.to_string(index=False))
     print()
     print("── Long Gap Rates (% of intervals > 10 min) ────────────────────")
     print(gap_data.to_string(index=False))
+    print()
+    print("── MTA Staff Summary Baseline Test (Queens Plaza, peak hours) ──")
+    print(mta_df.to_string(index=False))
     print()
 
     # Charts
@@ -922,8 +1260,9 @@ def main():
         fname="queensboro_plaza_7nw.png",
     )
     plot_long_gaps(gap_data, OUT_DIR)
+    plot_mta_baseline_comparison(mta_df, anchor_median, OUT_DIR)
 
-    write_report(summary, gap_data, OUT_DIR)
+    write_report(summary, gap_data, mta_df, anchor_median, OUT_DIR)
 
     print(f"\nAll outputs saved to: {OUT_DIR.resolve()}/")
 

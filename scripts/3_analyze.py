@@ -262,15 +262,21 @@ def summarize_headways(df_hw: pd.DataFrame) -> pd.DataFrame:
         p90=lambda x: x.quantile(0.90),
         p95=lambda x: x.quantile(0.95),
         max_gap="max",
+        pct_over_5=lambda x: (x > 5).mean() * 100,
         pct_over_10=lambda x: (x > 10).mean() * 100,
         pct_over_15=lambda x: (x > 15).mean() * 100,
+        pct_over_20=lambda x: (x > 20).mean() * 100,
+        pct_over_25=lambda x: (x > 25).mean() * 100,
+        pct_over_30=lambda x: (x > 30).mean() * 100,
     ).reset_index()
 
     s = _add_wait_time_column(s)
 
     s = s.round({
         "median": 2, "mean": 2, "p25": 2, "p75": 2, "p90": 2, "p95": 2,
-        "max_gap": 2, "pct_over_10": 1, "pct_over_15": 1,
+        "max_gap": 2,
+        "pct_over_5": 1, "pct_over_10": 1, "pct_over_15": 1,
+        "pct_over_20": 1, "pct_over_25": 1, "pct_over_30": 1,
         "wait_time_min": 2,
     })
     s["direction"] = s["direction"].map(

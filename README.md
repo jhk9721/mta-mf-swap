@@ -47,6 +47,16 @@ The critical difference between subwaydata.nyc and most transit apps is **comple
 
 ---
 
+## `0_setup.py` — Environment verification
+
+**What it does:** A pre-flight check that confirms a reviewer's machine is ready to run the rest of the pipeline before any data is downloaded. It verifies the Python version (≥ 3.9), checks that the required packages are installed at minimum versions (`requests`, `pandas`, `numpy`, `matplotlib`, `tqdm`), confirms at least 1 GB of free disk space, tests connectivity to subwaydata.nyc, and creates the `raw_data/` and `results/` output directories if they don't exist. Each check prints `[OK]`, `[WARN]`, or `[FAIL]`; the script exits non-zero if anything fails.
+
+**Why this matters for reproducibility:** A reviewer who tries to reproduce our numbers shouldn't waste a 30-minute download discovering a missing package or a wrong Python version. Running `python3 0_setup.py` first surfaces those problems in seconds.
+
+**Run order:** Run this once before anything else. Re-run only after changing Python environments.
+
+---
+
 ## `1_download.py` — Pulling the raw data
 
 **What it does:** Downloads compressed archives of MTA real-time data for five months: October and November 2025 (before the swap), December 2025 (the swap happened on December 8), and January and February 2026 (after the swap). Each day is a separate compressed file containing the train location records for that day. The total download is roughly 300–600 MB.
@@ -66,6 +76,18 @@ The critical difference between subwaydata.nyc and most transit apps is **comple
 **Run order:** Run `1_download.py` first, then this script. All files land in the same `raw_data/` folder and are picked up automatically by the analysis scripts.
 
 **Estimated download:** ~130 additional days of data, roughly 260–520 MB. Allow 15–30 minutes depending on your connection.
+
+---
+
+## `1c_download_gtfs_static.py` — Downloading the MTA's published schedule
+
+**What it does:** Downloads and unzips the MTA's public GTFS static feed (`google_transit.zip`) into `Resources/gtfs_static/`. This is the official, published *schedule* — what the MTA says trains are supposed to do — as distinct from the GTFS real-time feed used everywhere else in this analysis, which records what trains actually did. The script is idempotent: it skips the download if the expected files (`stops.txt`, `stop_times.txt`, `trips.txt`, `routes.txt`, `calendar.txt`, plus several others) are already present. Pass `--force` to re-download.
+
+**Why we need both feeds:** The realized-headway analysis (scripts 3 through 11) uses only the real-time archive. Script 12 introduces a separate comparison — scheduled vs. realized — which requires the static schedule as its second input. Keeping the static download in its own script means reviewers who only want to verify the realized headway findings don't need to pull the schedule data.
+
+**Run order:** Required before `12_schedule_vs_realized.py`. Otherwise standalone.
+
+**Output:** `Resources/gtfs_static/` containing the canonical GTFS text files.
 
 ---
 
@@ -263,6 +285,83 @@ The correct approach is to measure M arrivals at stations that were on the M rou
 - `control_arrivals_trend.png` — daily arrivals over time with 7-day rolling average
 - `control_monthly_trend.png` — monthly averages, M and R, with swap boundary marked
 - `control_stations_report.txt` — plain-English findings
+
+---
+
+## `11_did_control_stations.py` — Difference-in-differences against unaffected stations
+
+**What it does:** Implements a formal difference-in-differences (DiD) test to close the MTA's anticipated defense that "the post-swap period was unusually bad because of winter storms and systemwide incidents, not the swap." The script compares the pre→post change in wait times at Roosevelt Island (the treated station) against the pre→post change at two control stations whose service was unaffected by the swap:
+
+1. **7 train at Queensboro Plaza (718)** — a fully independent line on a different division (IRT vs. B division), different rolling stock, and a different signaling/control system. This is the strongest possible control for citywide weather or operational shocks.
+2. **R train at Queens Plaza (G21)** — same Queens Blvd corridor as the affected M, but the R's route was unchanged through the swap. This captures any corridor-level weather, incident, or ridership effect that would have hit both the M and the R.
+
+The DiD residual is the Roosevelt Island change *minus* the control change. If winter weather and systemwide incidents drove the post-swap numbers, the controls would inflate too and the residual would shrink toward zero. They don't — the residual remains large, which isolates the swap as the cause. Confidence intervals are produced by bootstrap resampling (1,000 iterations, fixed seed = 42 for exact reproducibility).
+
+**Run order:** Run `3_analyze.py` and `8_analyze_queensboro_plaza.py` first; this script consumes their CSV outputs.
+
+**Outputs** (saved to `results/did_control_stations/`):
+- `did_summary.csv` — DiD point estimates and bootstrap confidence intervals for each control
+- `did_monthly.csv` — monthly wait-time series per station
+- `did_chart.png` — bar chart of treatment Δ vs. each control Δ vs. the DiD residual
+- `did_monthly.png` — monthly trend lines, treatment overlaid against both controls
+- `did_report.txt` — plain-English narrative
+
+---
+
+## `12_schedule_vs_realized.py` — Did the MTA even *schedule* the service it promised?
+
+**What it does:** Compares the MTA's own published schedule (GTFS static) against what trains actually did (GTFS real-time) at Roosevelt Island. This separates two distinct failures: a planning failure (the schedule itself does not deliver on the commitment) and an operational failure (trains do not run on the schedule). The script runs two falsifiable comparisons:
+
+1. **Post-swap weekday M trains** — scheduled peak headway vs. realized peak headway. If realized exceeds scheduled, that is a reliability gap that exists regardless of whether the underlying plan was sound.
+2. **Post-swap weekend F trains** (methodology control) — weekend F service is unchanged by the swap, so any scheduled-vs-realized gap here represents the methodology's noise floor. It tells a reviewer how much GTFS-RT and GTFS static can differ even when nothing has changed.
+
+The script also tests the September 2025 Staff Summary's specific written commitment that "peak-hour M service" would be increased so the average additional wait time would be "approximately 1 minute on average." Using the MTA's own wait-time methodology (average wait = headway ÷ 2), that promise translates to a scheduled peak headway no greater than ~7 minutes. We can test directly whether the schedule itself respects that commitment, independent of whether the trains hit the schedule.
+
+**Run order:** Run `1c_download_gtfs_static.py` and `3_analyze.py` first.
+
+**Outputs** (saved to `results/schedule_vs_realized/`):
+- `schedule_vs_realized_hourly.csv` — per-hour scheduled vs. realized headway
+- `schedule_vs_realized_buckets.csv` — per time-bucket comparison
+- `schedule_vs_realized_chart.png` — line chart, weekday M
+- `schedule_vs_realized_weekend.png` — weekend F methodology control
+- `schedule_vs_realized_report.txt` — plain-English findings
+
+---
+
+## `13_journey_time_analysis.py` — End-to-end travel time for a Roosevelt Island rider
+
+**What it does:** Moves beyond headways (how long you wait) to the rider's actual concern: total journey time (how long it takes to get to work). For a southbound Roosevelt Island commuter during weekday morning peak, the script computes end-to-end travel time to several representative Manhattan destinations — Lex Av/63 St, 57 St-6 Av, Rockefeller Center, Herald Sq, W 4 St, Broadway-Lafayette, 2 Av, and Delancey-Essex — before vs. after the swap.
+
+**An important methodological clarification:** Despite the Staff Summary's phrasing, which implied the post-swap M would diverge from the 63rd Street line at 57 St, the post-swap weekday M in fact continues south on the 6 Ave Manhattan line all the way through Broadway-Lafayette before turning east to Brooklyn. Verified from GTFS static. This means Roosevelt Island riders going to most 6 Ave destinations have *direct* M service post-swap, just as they had direct F service pre-swap — the journey-time delta is driven by headway change, not by added transfers, at those stops. For destinations south of Broadway-Lafayette that are F-only (2 Av, Delancey-Essex), the script adds a transfer penalty at Broadway-Lafayette equal to half of the median post-swap F headway there (the MTA's own wait-time methodology).
+
+For direct journeys, travel time is computed as the difference between arrival timestamps at origin and destination within the same trip_uid. Filters: weekday only, non-holiday, 6–9 AM peak.
+
+**Run order:** Run `1_download.py` and `1b_download_extended.py` first. Standalone — reads raw archives directly.
+
+**Outputs** (saved to `results/journey_times/`):
+- `journey_times.csv` — one row per origin-destination × period × journey type
+- `journey_times.png` — bar chart, Δ travel time per destination
+- `journey_times_report.txt` — plain-English findings
+
+---
+
+## `14_commitment_scorecard.py` — Single-page verdict against each written promise
+
+**What it does:** Consolidates findings from scripts 3, 7, 8, 9, 11, and 12 into a single one-page scorecard, organized around the specific falsifiable commitments the MTA made in its September 15, 2025 Staff Summary and its April 23, 2026 letter. For each commitment, the scorecard quotes the MTA's own language, reports the measured value from our data, and assigns one of five verdicts:
+
+- **PASS** — commitment met
+- **FAIL** — commitment broken (with the magnitude of the miss)
+- **PARTIAL** — qualified support
+- **UNTESTED** — analysis not yet performed
+- **UNKNOWN** — required input CSV is missing; re-run the upstream script
+
+This script performs *no new analysis*. It only reads and synthesizes the CSV outputs produced by earlier scripts. That separation is deliberate: a reviewer who is skeptical of any single verdict can trace it back to the exact CSV row and the exact script that produced it. If a CSV is missing, the script flags it as `UNKNOWN` rather than fabricating a result.
+
+**Run order:** Run as the final step, after all upstream analysis scripts have produced their CSVs.
+
+**Outputs** (saved to `results/`):
+- `commitment_scorecard.txt` — narrative, one section per commitment
+- `commitment_scorecard.csv` — tabular, one row per commitment for easy reference
 
 ---
 

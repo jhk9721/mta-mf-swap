@@ -10,7 +10,7 @@ The MTA publishes real-time train location data — essentially a live feed of w
 
 We then measured something called a "headway" (how many minutes passed between one train arriving and the next one arriving). We did this for every train, every day, to answer the question: Are trains coming more or less frequently than before?
 
-The answer was stark. During the evening commute home, the gap between trains more than doubled, from about 4 minutes to about 8 minutes. During the morning commute to Manhattan, it went up 71%. Every single time period got worse. The MTA's promised "about 1 extra minute" turned out to be an extra 3 to 4 minutes in practice.
+The answer was stark. During the evening commute home, the gap between trains nearly doubled, from about 4.0 minutes to about 7.5 minutes (+88%). During the morning commute to Manhattan, it went from about 4.75 minutes to about 7.75 minutes (+63%). Every weekday time period got worse. Translated to the MTA's own wait-time formula (average wait = headway ÷ 2), the typical rider's wait grew by about 1.5 minutes, peaking near 2 minutes in the worst peak hours — well above the "approximately 1 minute" the MTA committed to.
 
 We then found the MTA's own internal planning document from before the swap was implemented. It was signed by their Chief of Operations Planning and approved all the way up to the MTA President. That document explicitly admitted Roosevelt Island would face longer waits — and made a specific written promise to add extra M train service to mitigate the impact to roughly one extra minute of wait time. We can now show, with their own data, that the promise was not kept.
 We also built a public interactive website where anyone can explore the data themselves. And we put everything, including the raw data, the code, and the methodology, on GitHub so that anyone, including the MTA, can check our work.
@@ -160,15 +160,15 @@ The analysis includes the holiday period (December 22 – January 5). We conside
 
 ### The January 25 storm
 
-A significant winter storm hit New York on January 25, 2026. We ran the analysis three ways: including all post-swap data, excluding the storm period (January 25 onward), and comparing just December 8 – January 24. The results:
+A significant winter storm hit New York on January 25, 2026. The MTA's anticipated defense is that the post-swap period was unusually bad because of weather. We tested this directly by stratifying weekday headways at Roosevelt Island into three periods:
 
-| Period | Median headway | vs. Pre-swap |
-|---|---|---|
-| Pre-swap (Oct 1–Dec 7) | 5.25 min | — |
-| Post-swap, pre-storm (Dec 8–Jan 24) | 8.08 min | **+54%** |
-| Post-storm (Jan 25–Feb 15) | 8.38 min | **+60%** |
+| Period | n (headways) | Median headway | vs. Pre-swap |
+|---|---|---|---|
+| Pre-swap (Oct 1 – Dec 7, 2025) | 17,491 | 6.08 min | — |
+| Post-swap, pre-storm (Dec 8 – Jan 24) | 9,579 | 8.92 min | **+47%** |
+| Post-storm (Jan 25 – Feb 15, 2026) | 3,991 | 8.85 min | **+46%** |
 
-The storm accounts for approximately 6 percentage points of the total increase in wait times. The swap accounts for the other 54. We report the conservative (pre-storm) figure of +54% as our headline, where precision matters, and note that the full period figure is +60%.
+The post-storm window is no worse than the pre-storm post-swap window — in fact it is fractionally lower. This rules out the "storms made it look worse" explanation: the degradation is the swap, not the weather. We report **+47%** as our headline. Numbers are recomputed end-to-end from `results/roosevelt_island_headways.csv` (weekday, headways 1–60 min, no other filters); the recomputation script and exact filters are in `scripts/3_analyze.py`.
 
 ---
 
@@ -213,7 +213,7 @@ The **weekend charts** serve a specific analytical purpose. Since the swap is we
 
 **What it does:** Extends the Roosevelt Island analysis to all three stations on the 63rd Street line — 21 St-Queensbridge (B04), Roosevelt Island (B06), and Lexington Av/63 St (B08) — and confirms that headway degradation is identical at all three. A route filter (F/FX pre-swap, M post-swap) is applied at every station to isolate the 63rd Street line service. This is especially important at B08, which is also served by the Q train; without the filter, Q arrivals would artificially compress measured headways there.
 
-**Why this matters:** After applying the route filter, arrival counts at all three stations are within 1% of each other in every time bucket and direction. Median headways vary by at most 0.1–0.2 minutes across stations — which is expected, since the same physical trains stop at B04, B06, and B08 sequentially with no branching. The three-station agreement is independent methodological validation: it rules out the possibility that Roosevelt Island's numbers are a station-specific data artifact. The degradation is a line-level service change.
+**Why this matters:** After applying the route filter, arrival counts at all three stations are within 1.5% of each other in every time bucket and direction (within 1% in four of six buckets; max spread 1.51% in evening rush southbound). Median headways vary by at most 0.1–0.2 minutes across stations — which is expected, since the same physical trains stop at B04, B06, and B08 sequentially with no branching. The three-station agreement is independent methodological validation: it rules out the possibility that Roosevelt Island's numbers are a station-specific data artifact. The degradation is a line-level service change.
 
 **Run order:** Run `1_download.py` and `1b_download_extended.py` first. This script is otherwise standalone — it does not depend on `3_analyze.py`.
 
@@ -226,11 +226,11 @@ The **weekend charts** serve a specific analytical purpose. Since the swap is we
 
 ---
 
-## `7_analyze_m_train_frequency.py` — Measuring the MTA's promised 6-minute headway
+## `7_analyze_m_train_frequency.py` — Measuring the MTA against its own wait-time commitment
 
-**What it does:** Directly tests whether the MTA delivered the enhanced M train service it committed to in its September 2025 Staff Summary. That document promised that adding extra peak M trains would bring headways to 6.0 minutes, limiting the wait time increase to approximately one minute over the F train's 4.0-minute headways. This script compares actual post-swap M train headways at Roosevelt Island against that 6.0-minute benchmark, and tracks whether service has improved month by month since the swap.
+**What it does:** Directly tests whether the MTA delivered on the wait-time commitment it made in its September 15, 2025 Staff Summary. The Staff Summary's verbatim commitment is that with added peak M service, *"the average additional wait time will be reduced to approximately 1 minute on average."* Using the MTA's own wait-time formula (average wait = headway ÷ 2), the script converts pre- and post-swap median headways at Roosevelt Island into average waits, computes the added wait above the F-train baseline, and compares it directly to the ~1-minute commitment. It also tracks whether the realized added wait has improved month by month since the swap.
 
-**Why this matters:** The MTA made two distinct commitments: (1) the overall wait time increase would be about one minute, and (2) it would add M trains to achieve 6-minute headways. Script 7 tests the second commitment. Actual post-swap headways at Roosevelt Island have run approximately 8–9 minutes — roughly 30–50% above the promised level. The monthly trend data shows no meaningful improvement, suggesting the MTA has not taken corrective action.
+**Why this matters:** The Staff Summary's only numeric commitment about Roosevelt Island riders is the ~1-minute added-wait figure. We do not introduce any headway target the MTA did not publicly state. Using the MTA's own arithmetic, post-swap peak medians of approximately 7.5–8.7 minutes (monthly medians December 2025 through March 2026) translate to average waits of 3.75–4.35 minutes, vs. a pre-swap F-train average wait of ~2 minutes — an added wait of roughly 1.75 to 2.4 minutes, well above the ~1-minute commitment. The monthly trend shows no meaningful improvement, suggesting the MTA has not taken corrective action.
 
 **Data source:** Uses `results/roosevelt_island_headways.csv` from `3_analyze.py` if available (faster). Falls back to rebuilding from raw archives if the CSV is not present.
 
@@ -240,8 +240,8 @@ The **weekend charts** serve a specific analytical purpose. Since the swap is we
 - `m_train_trains_per_day.csv` — average daily train counts before/after, by direction and rush window
 - `m_train_headway_stats.csv` — median/p90 headways with gap vs. MTA promise
 - `m_train_monthly_trend.csv` — monthly breakdown of M headways since the swap
-- `m_train_vs_promise.png` — bar chart: actual F (before), actual M (after), and MTA's promised 6-minute level
-- `m_train_trend_over_time.png` — monthly median headway trend with promise and pre-swap F baseline marked
+- `m_train_vs_commitment.png` — bar chart: pre-swap F average wait, post-swap M average wait, and the MTA's verbatim "~1 minute" added-wait commitment line
+- `m_train_trend_over_time.png` — monthly median headway and average wait trend, with the pre-swap F baseline and the MTA's "~1 minute added wait" line marked
 - `m_train_frequency_report.txt` — plain-English findings
 
 ---

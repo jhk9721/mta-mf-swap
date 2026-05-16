@@ -182,15 +182,23 @@ def score_wait_time(boot: pd.DataFrame | None,
 
 def score_m_peak_headway(m_hw: pd.DataFrame | None) -> dict:
     """
-    Sept 2025 Slide 11: "M trains [will run] every 6 minutes during rush hours."
-    Test: realized M post-swap peak median headway at RI.
+    Staff Summary, Sept 15 2025 (verbatim): "the average additional wait
+    time will be reduced to approximately 1 minute on average."
+
+    Test the verbatim wait-time commitment directly: realized added wait
+    = (post-swap median − pre-swap median) / 2, averaged across peak
+    (direction, bucket) cells. No derived headway target is introduced.
     """
     info = {
         "id": "2",
-        "title": "M-train peak headway at Roosevelt Island",
-        "commitment_source": "Staff Summary Slide 11, Sept 15 2025",
-        "commitment_text": "M trains [will run] every 6 minutes during rush hours.",
-        "benchmark_text": "Median peak headway ≤ 6.0 min",
+        "title": "Average added wait at Roosevelt Island (verbatim MTA commitment)",
+        "commitment_source": "Staff Summary, Sept 15 2025",
+        "commitment_text": (
+            'Verbatim: "AM and PM peak-hour M service will be increased, so '
+            'that the average additional wait time will be reduced to '
+            'approximately 1 minute on average."'
+        ),
+        "benchmark_text": "Average peak added wait ≈ +1.0 min (verbatim Staff Summary commitment)",
         "measurement_text": "",
         "verdict": "UNKNOWN",
         "evidence_source": "results/m_train_frequency/m_train_headway_stats.csv (7_analyze_m_train_frequency.py)",
@@ -198,26 +206,44 @@ def score_m_peak_headway(m_hw: pd.DataFrame | None) -> dict:
     if m_hw is None or m_hw.empty:
         return info
 
-    post = m_hw[(m_hw["swap_period"].str.contains("After", case=False, na=False)) &
-                m_hw["time_bucket"].str[:2].isin({"2:", "4:"})]
-    if post.empty:
+    rush = m_hw[m_hw["time_bucket"].str[:2].isin({"2:", "4:"})]
+    pre = rush[rush["swap_period"].str.contains("Before", case=False, na=False)]
+    post = rush[rush["swap_period"].str.contains("After",  case=False, na=False)]
+    if pre.empty or post.empty:
         return info
 
-    medians = post["median"].astype(float)
-    avg_med = medians.mean()
-    info["measured_value"]  = round(float(avg_med), 2)
-    info["benchmark_value"] = 6.0
+    pre_idx = pre.set_index(["direction", "time_bucket"])["median"].astype(float)
+    post_idx = post.set_index(["direction", "time_bucket"])["median"].astype(float)
+    common = pre_idx.index.intersection(post_idx.index)
+    if len(common) == 0:
+        return info
 
-    lines = ["Realized post-swap M peak headway at B06:"]
-    for _, r in post.iterrows():
-        lines.append(f"    {r['direction']:<28} | {r['time_bucket']:<28} | "
-                     f"median {r['median']:.2f} min")
-    lines.append(f"  Mean of peak medians: {avg_med:.2f} min  (commitment: 6.00 min)")
+    pre_wait  = pre_idx.loc[common] / 2.0
+    post_wait = post_idx.loc[common] / 2.0
+    added_wait = post_wait - pre_wait
+    avg_added_wait = float(added_wait.mean())
+
+    info["measured_value"]  = round(avg_added_wait, 2)
+    info["benchmark_value"] = 1.0
+
+    lines = ["Realized added wait at B06 (post − pre, using avg wait = median / 2):"]
+    for (direction, bucket) in common:
+        lines.append(
+            f"    {direction:<28} | {bucket:<28} | "
+            f"pre wait {pre_wait.loc[(direction, bucket)]:.2f} → "
+            f"post wait {post_wait.loc[(direction, bucket)]:.2f} min  "
+            f"(added {float(added_wait.loc[(direction, bucket)]):+.2f})"
+        )
+    lines.append(f"  Mean added wait across peak cells: {avg_added_wait:+.2f} min  "
+                 f"(commitment: ~+1.00 min)")
     info["measurement_text"] = "\n  ".join(lines)
 
-    if avg_med > 6.5:
+    # Verdict thresholds in minutes of *added* wait. Matched to the DiD-based
+    # verdict in #1 for consistency (commitment is ~1.0 min "on average"):
+    #   ≤1.1 → PASS, ≤1.3 → PARTIAL, >1.3 → FAIL.
+    if avg_added_wait > 1.3:
         info["verdict"] = "FAIL"
-    elif avg_med <= 6.0:
+    elif avg_added_wait <= 1.1:
         info["verdict"] = "PASS"
     else:
         info["verdict"] = "PARTIAL"

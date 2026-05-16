@@ -51,11 +51,12 @@ INTERNAL CONTROL:
 
 SCOPE: PEAK HOURS ONLY (6–9 AM and 4–7 PM)
   The MTA's commitment was specifically about peak-hour M service: its
-  September 2025 Staff Summary promised extra AM and PM peak trains to
-  bring M headways to 6 minutes and limit the wait time increase to
-  approximately 1 minute. Analysis is restricted to those windows to
-  stay aligned with the MTA's own framing and avoid diluting the finding
-  with off-peak hours where no commitment was made.
+  September 15, 2025 Staff Summary stated that "AM and PM peak-hour M
+  service will be increased, so that the average additional wait time
+  will be reduced to approximately 1 minute on average." Analysis is
+  restricted to peak windows to stay aligned with the MTA's own framing
+  and avoid diluting the finding with off-peak hours where no commitment
+  was made.
 
   December 2025 is excluded from all period comparisons and monthly trend
   charts. The swap took effect on December 8, making December a split
@@ -686,10 +687,11 @@ def write_report(summary: pd.DataFrame, monthly: pd.DataFrame, out_dir: Path):
         "  after the swap, the MTA did not run more M trains — it rerouted the",
         "  same number of trains over a longer route.",
         "",
-        "  This finding, combined with Script 7's headway data (median rush",
-        "  headways of 8–9 min at Roosevelt Island vs. the MTA's promised 6 min),",
-        "  establishes that the MTA both failed to add trains and failed to",
-        "  deliver the frequency it promised at the station level.",
+        "  This finding, combined with Script 7's wait-time data (realized",
+        "  added wait at Roosevelt Island is roughly +1.6 min vs. the MTA's",
+        "  verbatim \"~1 minute on average\" commitment), establishes that the",
+        "  MTA both failed to add peak trains and failed to deliver the wait-",
+        "  time outcome it committed to at the station level.",
         "",
         "=" * 70,
         SOURCE_NOTE,

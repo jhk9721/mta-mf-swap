@@ -69,10 +69,15 @@ def load_headways(source: str = "csv", csv_path: str | None = None) -> pd.DataFr
 
 def _load_from_csv(path: str | None) -> pd.DataFrame:
     if path is None:
-        # Look in same directory as this file, then data/ subdirectory
+        # Look in same directory as this file, then data/ subdirectory.
+        # The gzipped copy is preferred — pandas decompresses by extension, and
+        # it keeps the committed file about a fifth of the raw CSV's size.
+        here = os.path.dirname(__file__)
         candidates = [
-            os.path.join(os.path.dirname(__file__), "roosevelt_island_headways.csv"),
-            os.path.join(os.path.dirname(__file__), "data", "roosevelt_island_headways.csv"),
+            os.path.join(here, "roosevelt_island_headways.csv.gz"),
+            os.path.join(here, "roosevelt_island_headways.csv"),
+            os.path.join(here, "data", "roosevelt_island_headways.csv.gz"),
+            os.path.join(here, "data", "roosevelt_island_headways.csv"),
         ]
         for p in candidates:
             if os.path.exists(p):
@@ -80,7 +85,7 @@ def _load_from_csv(path: str | None) -> pd.DataFrame:
                 break
         if path is None:
             raise FileNotFoundError(
-                "Cannot find roosevelt_island_headways.csv. "
+                "Cannot find roosevelt_island_headways.csv[.gz]. "
                 "Place it in the same directory as app.py or in a data/ subfolder."
             )
     return _prepare(pd.read_csv(path))

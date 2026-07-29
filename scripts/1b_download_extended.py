@@ -11,7 +11,11 @@ Downloads CSV data from subwaydata.nyc for months not covered by
     - April 2025      <- optional: extends trend window
     - February 2026   <- gap fill (1_download.py may have cut off at Feb 15;
                          files already on disk are skipped automatically)
-    - March 2026      <- post-swap trend through today (Mar 12, 2026)
+    - March 2026      <- post-swap trend
+    - April 2026      <- post-swap trend
+    - May 2026        <- post-swap trend
+    - June 2026       <- post-swap trend
+    - July 2026       <- post-swap trend through today (July 2026)
 
   ALREADY downloaded by 1_download.py (not re-downloaded here):
     - October 2025, November 2025, December 2025  (pre-swap)
@@ -36,8 +40,8 @@ HOW TO RUN:
      the new data.
 
 ESTIMATED DOWNLOAD:
-  ~130 days of new data -> roughly 260-520 MB compressed.
-  Allow 15-30 minutes depending on your connection.
+  ~250 days of new data on a first run -> roughly 250-500 MB compressed.
+  Allow 20-40 minutes depending on your connection.
   Files already on disk are skipped, so re-runs are safe.
 """
 
@@ -57,7 +61,11 @@ MONTHS = [
     (2025,  3),   # March 2025     ← optional: extends trend window
     (2025,  4),   # April 2025     ← optional: extends trend window
     (2026,  2),   # February 2026  ← completes Feb (1_download.py may have cut off at Feb 15)
-    (2026,  3),   # March 2026     ← post-swap trend through today (Mar 12)
+    (2026,  3),   # March 2026     ← post-swap trend
+    (2026,  4),   # April 2026     ← post-swap trend
+    (2026,  5),   # May 2026       ← post-swap trend
+    (2026,  6),   # June 2026      ← post-swap trend
+    (2026,  7),   # July 2026      ← post-swap trend through today
 ]
 
 BASE_URL = "https://subwaydata.nyc/data"
@@ -115,7 +123,7 @@ def main():
     print(f"Saving files to: {os.path.abspath(OUTPUT_DIR)}\n")
     print("Purpose: (1) Jan/Feb 2025 baseline for seasonality test")
     print("         (2) Fill Feb 16-28 2026 gap from 1_download.py")
-    print("         (3) Extend post-swap trend through Mar 12, 2026\n")
+    print("         (3) Extend post-swap trend through the current month\n")
 
     downloaded, skipped, missing, failed = 0, 0, 0, 0
     total_dates = 0
@@ -130,7 +138,11 @@ def main():
             (2025, 3): "extended trend window",
             (2025, 4): "extended trend window",
             (2026, 2): "gap fill (complete Feb 2026)",
-            (2026, 3): "post-swap trend through today",
+            (2026, 3): "post-swap trend",
+            (2026, 4): "post-swap trend",
+            (2026, 5): "post-swap trend",
+            (2026, 6): "post-swap trend",
+            (2026, 7): "post-swap trend through today",
         }.get((year, month), "")
         print(f"── {month_label}  [{purpose}]  ({len(dates)} days) ──────────")
         for d in dates:

@@ -683,7 +683,7 @@ MTA'S OWN PROJECTION — STILL THE STRONGEST EVIDENCE
   Even setting aside the seasonality analysis, the MTA's own September 2025
   Staff Summary projected "approximately 1 minute" of additional average wait
   time from the swap. The MTA's analysts were aware of seasonal variation when
-  they made that projection. Our observed increase of {fmt(ev_swap)} in evening
+  they made that projection. Our observed increase of {ev_swap} in evening
   rush headways — same season, same station — exceeds the MTA's own forecast
   by a factor of 3–4x.
 

@@ -9,6 +9,7 @@ Data:  Place roosevelt_island_headways.csv alongside this file (or in data/).
 """
 
 import os
+from datetime import date, timedelta
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -95,6 +96,16 @@ st.markdown(f"""
     max-width: 720px;
     line-height: 1.55;
   }}
+  .header-stamp {{
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: {TEXT_MUTED};
+    margin-top: 0.9rem;
+  }}
+  .header-stamp strong {{ color: {MTA_ORANGE}; }}
 
   /* ── Navigation bar ── */
   .nav-bar {{
@@ -268,6 +279,86 @@ st.markdown(f"""
     margin-top: 0.8rem;
   }}
 
+  /* ── Commitment scorecard ── */
+  .score-tally {{
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin: 1rem 0 1.4rem;
+  }}
+  .score-tally-item {{
+    background: {MID_NAVY};
+    border: 1px solid {LIGHT_NAVY};
+    border-radius: 8px;
+    padding: 0.7rem 1.2rem;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: {TEXT_LIGHT};
+  }}
+  .score-tally-item span {{
+    display: block;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: {TEXT_MUTED};
+    margin-top: 0.2rem;
+  }}
+  .score-row {{
+    background: {MID_NAVY};
+    border: 1px solid {LIGHT_NAVY};
+    border-left: 4px solid {LIGHT_NAVY};
+    border-radius: 0 8px 8px 0;
+    padding: 1rem 1.2rem;
+    margin-bottom: 0.7rem;
+  }}
+  .score-row.fail    {{ border-left-color: {RED_AFTER}; }}
+  .score-row.partial {{ border-left-color: {MTA_ORANGE}; }}
+  .score-row.pass    {{ border-left-color: {GREEN_OK}; }}
+  .score-chip {{
+    display: inline-block;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border-radius: 4px;
+    padding: 0.15rem 0.55rem;
+    margin-right: 0.6rem;
+    color: white;
+  }}
+  .score-chip.fail    {{ background: {RED_AFTER}; }}
+  .score-chip.partial {{ background: {MTA_ORANGE}; }}
+  .score-chip.pass    {{ background: {GREEN_OK}; }}
+  .score-chip.unknown {{ background: {LIGHT_NAVY}; color: {TEXT_MUTED}; }}
+  .score-title {{
+    font-weight: 600;
+    color: {TEXT_LIGHT};
+    font-size: 0.92rem;
+  }}
+  .score-quote {{
+    font-size: 0.84rem;
+    color: {TEXT_MUTED};
+    font-style: italic;
+    line-height: 1.5;
+    margin: 0.55rem 0 0.45rem;
+  }}
+  .score-measure {{
+    font-size: 0.84rem;
+    color: {TEXT_LIGHT};
+    line-height: 1.5;
+  }}
+  .score-measure b {{ color: {RED_AFTER}; }}
+  .score-source {{
+    font-size: 0.72rem;
+    color: {TEXT_MUTED};
+    opacity: 0.8;
+    margin-top: 0.45rem;
+    font-family: monospace;
+  }}
+
   /* ── Key-questions grid ── */
   .qa-grid {{
     display: grid;
@@ -355,6 +446,20 @@ def get_data() -> pd.DataFrame:
     return load_headways(source="csv")
 
 
+_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+
+
+@st.cache_data(ttl=3600)
+def load_supplement(name: str):
+    """
+    Load a small CSV produced by the analysis scripts (scorecard, DiD summary).
+    Returns None if the file isn't shipped, so the page degrades to its other
+    sections instead of erroring out.
+    """
+    path = os.path.join(_DATA_DIR, name)
+    return pd.read_csv(path) if os.path.exists(path) else None
+
+
 df = get_data()
 n_obs      = len(df)
 date_min   = df["arrival_date"].min()
@@ -374,7 +479,27 @@ ev_pct        = (ev_nb_a - ev_nb_b) / ev_nb_b * 100
 am_pct        = (am_sb_a - am_sb_b) / am_sb_b * 100
 ev_delta      = ev_nb_a - ev_nb_b
 am_delta      = am_sb_a - am_sb_b
-monthly_extra = am_delta * 2 * 22
+# Added wait on a weekday round trip (one morning wait + one evening wait),
+# in the MTA's wait terms, across a 22-day working month.
+monthly_extra = (am_delta / 2 + ev_delta / 2) * 22
+
+# Difference-in-differences summary (scripts/11) — loaded up front because the
+# FAQ cites it before the section that plots it.
+_did = load_supplement("did_summary.csv")
+if _did is not None:
+    did_mean       = _did["did"].mean()
+    did_ctrl_mean  = _did["ctrl_delta"].mean()
+    did_treat_mean = _did["treat_delta"].mean()
+    did_cells_pos  = int((_did["did_ci_low"] > 0).sum())
+    did_cells_over = int((_did["did_ci_low"] > 1.0).sum())
+    did_n_cells    = len(_did)
+
+# The MTA's commitment is about *wait*, and its own formula is
+# average wait = headway / 2. Compare like with like: convert the headway
+# change into added average wait before measuring the promise against it.
+ev_wait_delta = ev_delta / 2
+am_wait_delta = am_delta / 2
+miss_factor   = ((ev_wait_delta + am_wait_delta) / 2) / 1.0
 
 # Extreme wait statistics — both directions, swap-active hours, weekdays
 _ew_bef = df[df["within_swap_window"] & (df["day_type"] == "Weekday") & (df["swap_period"] == "Before swap")]["headway_min"]
@@ -384,6 +509,50 @@ _aft_days = df[df["is_weekday"] & (df["arrival_date"] >= SWAP_DATE)]["arrival_da
 ew_bef = {t: (100*(_ew_bef > t).mean(), (_ew_bef > t).sum()/_bef_days) for t in [15, 20, 25]}
 ew_aft = {t: (100*(_ew_aft > t).mean(), (_ew_aft > t).sum()/_aft_days) for t in [15, 20, 25]}
 
+# How to describe the evening-rush change in words. Derived from the data so the
+# copy can't outrun the numbers as more months land.
+if ev_pct >= 100:
+    ev_phrase = "more than doubled"
+elif ev_pct >= 85:
+    ev_phrase = "nearly doubled"
+elif ev_pct >= 50:
+    ev_phrase = f"risen by {ev_pct:.0f}%"
+else:
+    ev_phrase = f"risen {ev_pct:.0f}%"
+
+# "1-in-N chance of a 10+ minute wait" — derived, never hardcoded
+one_in_before = round(100 / pct_over_10_before) if pct_over_10_before else 0
+one_in_after  = round(100 / pct_over_10_after)  if pct_over_10_after  else 0
+
+# Period labels — everything downstream reads these instead of literal dates
+pre_start   = df[df["arrival_date"] < SWAP_DATE]["arrival_date"].min()
+post_start  = SWAP_DATE
+pre_label   = f"{pre_start:%b %-d, %Y} – {SWAP_DATE - timedelta(days=1):%b %-d, %Y}"
+post_label  = f"{post_start:%b %-d, %Y} – {date_max:%b %-d, %Y}"
+post_months = f"{post_start:%b %Y} – {date_max:%b %Y}"
+updated_str = date.today().strftime("%B %-d, %Y")
+
+# Weekend control (the swap is weekday-only) and the holiday-week check —
+# both recomputed so the prose follows the data rather than an older vintage.
+_we = df[(df["day_type"] == "Weekend") & (df["hour"] >= 6) & (df["hour"] < 19)]
+_we_b = _we[_we["swap_period"] == "Before swap"]["headway_min"].median()
+_we_a = _we[_we["swap_period"] == "After swap"]["headway_min"].median()
+weekend_pct = (_we_a - _we_b) / _we_b * 100
+
+_post_peak = df[df["is_weekday"] & df["within_swap_window"] & (df["arrival_date"] >= SWAP_DATE)]
+_hol = pd.date_range("2025-12-22", "2026-01-05").date
+post_med_all = _post_peak["headway_min"].median()
+post_med_nohol = _post_peak[~_post_peak["arrival_date"].isin(_hol)]["headway_min"].median()
+
+# Storm sensitivity — recomputed here so the prose can never drift from the chart
+_storm_date  = date(2026, 1, 25)
+_sw          = df[df["is_weekday"] & df["within_swap_window"]]
+_sw_pre      = _sw[_sw["arrival_date"] < SWAP_DATE]["headway_min"].median()
+_sw_prestorm = _sw[(_sw["arrival_date"] >= SWAP_DATE) & (_sw["arrival_date"] < _storm_date)]["headway_min"].median()
+_sw_poststorm= _sw[_sw["arrival_date"] >= _storm_date]["headway_min"].median()
+storm_pct_before = (_sw_prestorm - _sw_pre) / _sw_pre * 100    # degradation before the storm hit
+storm_pct_after  = (_sw_poststorm - _sw_pre) / _sw_pre * 100   # degradation once the storm is included
+
 
 # ── Header ────────────────────────────────────────────────────────────────────
 st.markdown(f"""
@@ -392,8 +561,11 @@ st.markdown(f"""
   <div class="header-title">The F/M Swap Is Hurting Roosevelt Island</div>
   <div class="header-subtitle">
     Since December 8, 2025, the MTA replaced the F train with the M on weekdays.
-    Median evening rush wait times have more than doubled. This dashboard documents the impact
+    Median evening rush wait times have {ev_phrase}. This dashboard documents the impact
     using {n_obs:,} train observations across {n_weekdays} weekdays.
+  </div>
+  <div class="header-stamp">
+    Data through <strong>{date_max:%B %-d, %Y}</strong> · dashboard updated {updated_str}
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -405,6 +577,9 @@ st.markdown(f"""
   <a href="#pattern">Full Picture</a>
   <a href="#commuters">For Commuters</a>
   <a href="#mta-promise">MTA's Promise</a>
+  <a href="#trend">Since Then</a>
+  <a href="#response">MTA's Response</a>
+  <a href="#scorecard">Scorecard</a>
   <a href="#data">The Data</a>
   <a href="#action">Take Action</a>
   <span style="margin:0 1rem; color:{LIGHT_NAVY};">|</span>
@@ -420,9 +595,11 @@ track_scroll_depth()
 st.markdown(f"""
 <div class="plain-summary">
   <div class="ps-label">The short version</div>
-  On December 8, 2025, the MTA replaced the F train with the less-frequent M train on Roosevelt Island —
-  without a compensating service improvement. Median evening wait times have <strong>more than doubled</strong>,
-  and the MTA's own promised fix of "~1 minute extra" has not materialized.
+  On December 8, 2025, the MTA replaced the F train with the less-frequent M train on Roosevelt Island.
+  Median evening gaps between trains have <strong>{ev_phrase}</strong>. The MTA did promise extra peak M
+  service to hold the added wait to "approximately 1 minute" — peak M arrivals on the shared Queens Blvd
+  stations are up about 3%, nowhere near enough, and the added wait at Roosevelt Island is
+  {am_wait_delta:.1f}–{ev_wait_delta:.1f} minutes.
   All figures below are based on <strong>{n_obs:,} real train arrivals</strong> pulled from the MTA's official
   GTFS real-time feed. Scroll down for charts, or jump ahead using the links above.
 </div>
@@ -456,14 +633,14 @@ with c3:
     st.markdown(metric_card(
         "Extra Wait Time Per Month",
         f"{monthly_extra:.0f} min",
-        f"Based on median increase × daily round-trip × 22 working days",
+        f"Added wait on a weekday round trip (AM + PM), 22 working days",
         "warning"
     ), unsafe_allow_html=True)
 with c4:
     st.markdown(metric_card(
         "Evening Waits Over 10 Minutes",
         f"{pct_over_10_after:.0f}%",
-        f"1-in-3 northbound trains — up from {pct_over_10_before:.0f}% (1-in-5)",
+        f"1-in-{one_in_after} northbound trains — up from {pct_over_10_before:.0f}% (1-in-{one_in_before})",
         "alarm"
     ), unsafe_allow_html=True)
 
@@ -569,6 +746,8 @@ def direction_overview_fig(df: pd.DataFrame, direction: str, dir_label: str) -> 
     )
     fig.update_xaxes(tickmode="array", tickvals=x_pos, ticktext=tick_labels,
                      tickangle=-30, tickfont=dict(size=10))
+    # Angled tick labels need room, or the horizontal legend lands on top of them
+    fig.update_layout(margin=dict(l=10, r=10, t=60, b=90))
     return fig
 
 
@@ -647,13 +826,15 @@ def evening_spotlight_fig(df: pd.DataFrame) -> go.Figure:
         )
     fig.update_layout(
         **PLOTLY_LAYOUT,
-        title=dict(text="<b>Evening Rush Hour (4–7 PM)</b><br><sup>Wait times have more than doubled since the F/M swap</sup>", font=dict(size=15)),
+        title=dict(text=f"<b>Evening Rush Hour (4–7 PM)</b><br><sup>Wait times have {ev_phrase} since the F/M swap</sup>", font=dict(size=15)),
         barmode="group",
         yaxis_title="Wait (min)",
         yaxis_range=[0, max(max(aft_p), max(bef_p)) * 1.5],
         height=530,
         legend=dict(**LEGEND_BASE, orientation="h", x=0.5, xanchor="center", y=-0.25, yanchor="top"),
     )
+    # Two-line tick labels need the extra bottom margin to clear the legend
+    fig.update_layout(margin=dict(l=10, r=10, t=70, b=80))
     return fig
 
 
@@ -700,7 +881,7 @@ def weekend_fig(df: pd.DataFrame) -> go.Figure:
     fig.update_layout(
         **PLOTLY_LAYOUT,
         title=dict(
-            text="<b>Weekend Headways — F Train Both Periods</b><br><sup>Swap is weekday-only. Weekend increases reflect general F-line shifts; weekday increases go far beyond this baseline.</sup>",
+            text="<b>Weekend Headways — F Train Both Periods</b><br><sup>Swap is weekday-only, so weekends are the control group: F service here did not degrade over the same months.</sup>",
             font=dict(size=14),
         ),
         barmode="group",
@@ -710,6 +891,113 @@ def weekend_fig(df: pd.DataFrame) -> go.Figure:
     fig.update_xaxes(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, tickangle=-45, tickfont=dict(size=10))
     fig.update_yaxes(gridcolor=LIGHT_NAVY, linecolor=LIGHT_NAVY, automargin=False)
     fig.update_yaxes(title_text="Wait (min)", col=1)
+    return fig
+
+
+def did_fig(did: pd.DataFrame) -> go.Figure:
+    """Treatment Δ vs. control Δ vs. swap-attributable residual, per peak cell."""
+    cells, treat, ctrl, resid, lo, hi = [], [], [], [], [], []
+    for (bucket, direction), grp in did.groupby(["time_bucket", "direction"], sort=False):
+        cells.append(f"{direction}<br>{bucket.split(' (')[0]}")
+        treat.append(grp["treat_delta"].mean())
+        ctrl.append(grp["ctrl_delta"].mean())
+        resid.append(grp["did"].mean())
+        lo.append(grp["did"].mean() - grp["did_ci_low"].mean())
+        hi.append(grp["did_ci_high"].mean() - grp["did"].mean())
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        name="Roosevelt Island (F → M)", x=cells, y=treat, marker_color=RED_AFTER,
+        hovertemplate="<b>%{x}</b><br>Roosevelt Island: %{y:+.2f} min<extra></extra>",
+    ))
+    fig.add_trace(go.Bar(
+        name="Control stations (R, 7)", x=cells, y=ctrl, marker_color=BLUE_BEFORE,
+        hovertemplate="<b>%{x}</b><br>Controls: %{y:+.2f} min<extra></extra>",
+    ))
+    fig.add_trace(go.Bar(
+        name="Swap-attributable (difference-in-differences)", x=cells, y=resid,
+        marker_color=MTA_ORANGE,
+        error_y=dict(type="data", symmetric=False, array=hi, arrayminus=lo,
+                     color=TEXT_LIGHT, thickness=1.2, width=5),
+        hovertemplate="<b>%{x}</b><br>DiD: %{y:+.2f} min<extra></extra>",
+    ))
+    fig.add_hline(
+        y=1.0, line_dash="dash", line_color=TEXT_MUTED,
+        annotation_text="MTA commitment: ~1 min", annotation_position="top left",
+        annotation_font=dict(size=11, color=TEXT_MUTED),
+    )
+    fig.update_layout(
+        **PLOTLY_LAYOUT,
+        title=dict(text="<b>Change in Average Wait — Roosevelt Island vs. Unaffected Lines</b>"
+                        "<br><sup>Controls stayed flat, so the gap is the swap, not the weather. "
+                        "Bars show minutes added per trip; whiskers are 95% bootstrap CIs.</sup>",
+                   font=dict(size=14)),
+        barmode="group",
+        yaxis_title="Change in average wait (minutes)",
+        height=470,
+        legend=dict(**LEGEND_BASE, orientation="h", x=0.5, xanchor="center", y=-0.30, yanchor="top"),
+    )
+    fig.update_layout(margin=dict(l=10, r=10, t=60, b=90))
+    return fig
+
+
+TREND_SERIES = [
+    ("Evening rush · northbound (commute home)", "Evening Rush (4–7 PM)", "N"),
+    ("Morning rush · southbound (to Manhattan)", "Morning Rush (6–9 AM)", "S"),
+]
+
+
+@st.cache_data(ttl=3600)
+def monthly_peak_medians(bucket: str, direction: str) -> pd.DataFrame:
+    """Monthly median headway for one peak cell, weekdays, from Oct 2025 on.
+    Months with fewer than 5 observed weekdays are dropped so a part-month
+    can't read as a trend."""
+    sub = df[df["is_weekday"] & (df["time_bucket"] == bucket) & (df["direction"] == direction)].copy()
+    sub["month"] = pd.to_datetime(sub["arrival_date"]).values.astype("datetime64[M]")
+    sub = sub[sub["month"] >= pd.Timestamp("2025-10-01")]
+    g = sub.groupby("month").agg(median=("headway_min", "median"),
+                                 days=("arrival_date", "nunique")).reset_index()
+    return g[g["days"] >= 5]
+
+
+def monthly_trend_fig(df: pd.DataFrame) -> go.Figure:
+    """Month-by-month peak medians — does the post-swap picture improve over time?"""
+    series = [
+        (TREND_SERIES[0][0], TREND_SERIES[0][1], TREND_SERIES[0][2], RED_AFTER, ev_nb_b),
+        (TREND_SERIES[1][0], TREND_SERIES[1][1], TREND_SERIES[1][2], MTA_ORANGE, am_sb_b),
+    ]
+
+    fig = go.Figure()
+    for label, bucket, direction, color, baseline in series:
+        g = monthly_peak_medians(bucket, direction)
+        fig.add_trace(go.Scatter(
+            name=label, x=g["month"], y=g["median"], mode="lines+markers",
+            line=dict(color=color, width=3), marker=dict(size=8),
+            hovertemplate="<b>%{x|%b %Y}</b><br>Median wait between trains: %{y:.1f} min<extra></extra>",
+        ))
+        fig.add_hline(y=baseline, line_dash="dot", line_color=color, opacity=0.45)
+
+    # Plotly's autorange pads this axis far too generously; pin it to the data
+    _months = monthly_peak_medians(*TREND_SERIES[0][1:3])["month"]
+    fig.update_xaxes(range=[_months.min() - pd.DateOffset(days=20),
+                            _months.max() + pd.DateOffset(days=20)])
+    fig.add_vline(x=pd.Timestamp(SWAP_DATE), line_dash="dash", line_color=TEXT_MUTED)
+    fig.add_annotation(x=pd.Timestamp(SWAP_DATE), y=1.0, yref="paper", yanchor="bottom",
+                       text="F → M swap", showarrow=False,
+                       font=dict(size=11, color=TEXT_MUTED))
+    fig.update_layout(
+        **PLOTLY_LAYOUT,
+        title=dict(text="<b>Median Wait Between Trains, Month by Month</b>"
+                        "<br><sup>Dotted lines mark the pre-swap F baseline for each commute. "
+                        "Weekdays only; months with fewer than 5 observed weekdays omitted.</sup>",
+                   font=dict(size=14)),
+        yaxis_title="Median minutes between trains",
+        yaxis_rangemode="tozero",
+        height=470,
+        legend=dict(**LEGEND_BASE, orientation="h", x=0.5, xanchor="center", y=-0.25, yanchor="top"),
+    )
+    # Left margin must hold the y tick labels; automargin can't expand a pinned margin
+    fig.update_layout(margin=dict(l=55, r=10, t=60, b=80))
     return fig
 
 
@@ -727,7 +1015,7 @@ def sensitivity_fig(df: pd.DataFrame) -> go.Figure:
     groups = [
         ("Pre-swap<br>(F train)", pre, BLUE_BEFORE),
         ("Post-swap<br>before storm", post_pre_storm, "#E89580"),
-        ("Post-storm<br>(Jan 25+)", post_storm, RED_AFTER),
+        (f"Post-storm<br>(Jan 25 – {date_max:%b %Y})", post_storm, RED_AFTER),
     ]
     labels  = [g[0] for g in groups]
     medians = [g[1]["headway_min"].median() for g in groups]
@@ -768,17 +1056,19 @@ def sensitivity_fig(df: pd.DataFrame) -> go.Figure:
 # SECTION 1 — THE IMPACT
 # ═══════════════════════════════════════════════════════════════════════════════
 st.markdown('<a id="hero"></a>', unsafe_allow_html=True)
-st.markdown('<div class="section-head">Evening Rush Waits Have More Than Doubled</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="section-head">Evening Rush Waits Have {ev_phrase.title()}</div>', unsafe_allow_html=True)
 
 _, stat_col, _ = st.columns([1, 2, 1])
 with stat_col:
     st.markdown(f"""
     <div class="big-stat">
       <div class="big-stat-number">{ev_nb_b:.1f} min &rarr; {ev_nb_a:.1f} min</div>
-      <div class="big-stat-label">Median evening northbound wait · 4–7 PM · weekdays</div>
+      <div class="big-stat-label">Median gap between evening northbound trains · 4–7 PM · weekdays</div>
       <div class="big-stat-sub">
-        The MTA promised "approximately 1 minute" longer.<br>
-        Riders are waiting <strong style="color:{MTA_ORANGE};">{ev_delta:.1f} minutes more</strong> — every single evening.
+        The MTA promised about <strong>1 extra minute</strong> of waiting.<br>
+        On the MTA's own arithmetic — average wait is half the gap between trains — riders are waiting
+        <strong style="color:{MTA_ORANGE};">{ev_wait_delta:.1f} minutes more</strong> every evening,
+        and the gap itself grew by {ev_delta:.1f} minutes.
       </div>
     </div>
     """, unsafe_allow_html=True)
@@ -793,8 +1083,10 @@ st.markdown(f"""
   due to the M running less frequently than the F. The MTA committed to increasing peak M service so
   that <strong>"the average additional wait time will be reduced to approximately 1 minute on average."</strong>
   <br><br>
-  Our analysis shows the actual median increase is <strong>{am_delta:.1f} minutes in the morning
-  and {ev_delta:.1f} minutes in the evening</strong> — the MTA missed its own target by a factor of 3–4×.
+  Measured the MTA's own way — average wait equals half the gap between trains — the added wait is
+  <strong>{am_wait_delta:.1f} minutes in the morning and {ev_wait_delta:.1f} minutes in the evening</strong>,
+  {miss_factor:.1f}× the commitment. The gap between trains itself grew by {am_delta:.1f} minutes
+  (morning) and {ev_delta:.1f} minutes (evening).
 </div>
 """, unsafe_allow_html=True)
 
@@ -930,8 +1222,8 @@ with col2:
 with st.expander("ℹ️ How to read this chart"):
     st.markdown(f"""
 Each bar shows what share of train gaps exceeded a given threshold during swap-active hours
-(6 AM–7 PM weekdays). There is now a **1-in-3 chance** of waiting 10+ minutes for the
-northbound train home — up from 1-in-5 before the swap. Every evening commute carries
+(6 AM–7 PM weekdays). There is now a **1-in-{one_in_after} chance** of waiting 10+ minutes for the
+northbound train home — up from 1-in-{one_in_before} before the swap. Every evening commute carries
 meaningful risk of a long delay. Daily round-trip commuters lose roughly
 **{monthly_extra:.0f} extra minutes per month** just standing on the platform.
     """)
@@ -961,14 +1253,14 @@ with col2:
     st.markdown(f"""
     <div style="background:rgba(232,51,74,0.07); border-left:4px solid {RED_AFTER}; padding:1.5rem;
                 border-radius:0 8px 8px 0; height:100%;">
-      <div class="promise-label" style="color:{RED_AFTER};">Observed Impact · Dec 2025 – Feb 2026</div>
+      <div class="promise-label" style="color:{RED_AFTER};">Observed Impact · {post_months}</div>
       <div class="promise-quote">
-        Morning commute: <strong style="color:{TEXT_LIGHT};">+{am_delta:.1f} minutes longer</strong><br>
-        Evening commute: <strong style="color:{TEXT_LIGHT};">+{ev_delta:.1f} minutes longer</strong>
+        Added wait, morning: <strong style="color:{TEXT_LIGHT};">+{am_wait_delta:.1f} minutes</strong><br>
+        Added wait, evening: <strong style="color:{TEXT_LIGHT};">+{ev_wait_delta:.1f} minutes</strong>
       </div>
       <div class="promise-attribution">
-        The MTA missed its own target by a factor of 3–4×.<br>
-        Roosevelt Island has no alternative subway line.
+        Computed the MTA's own way: average wait = half the gap between trains.
+        That is {miss_factor:.1f}× the commitment — and Roosevelt Island has no alternative subway line.
       </div>
     </div>
     """, unsafe_allow_html=True)
@@ -986,22 +1278,34 @@ with col2:
       <div class="qa-item">
         <div class="qa-q">Was the January 25 snowstorm responsible?</div>
         <div class="qa-verdict no">No</div>
-        <div class="qa-a">Wait times were already up <strong>54%</strong> before the storm hit.
-        Including the storm period raises that figure to ~60%. The weather did not cause this.</div>
+        <div class="qa-a">Wait times were already up <strong>{storm_pct_before:.0f}%</strong> before the
+        storm hit, and the whole post-storm stretch runs {storm_pct_after:.0f}% above the pre-swap
+        baseline — the degradation has now persisted for
+        {(date_max.year - post_start.year) * 12 + date_max.month - post_start.month} months,
+        through spring and summer. One winter storm cannot explain that.</div>
+      </div>
+      <div class="qa-item">
+        <div class="qa-q">Didn't the MTA say this was systemwide, not the swap?</div>
+        <div class="qa-verdict no">The controls say otherwise</div>
+        <div class="qa-a">Unaffected lines — the R at Queens Plaza and the 7 at Queensboro Plaza —
+        stayed flat across the same months. Netting them out still leaves
+        <strong>{did_mean:+.2f} min</strong> of added wait attributable to the swap. See
+        <a href="#response" style="color:{TEXT_MUTED};">the MTA's response</a> below.</div>
       </div>
       <div class="qa-item">
         <div class="qa-q">Is this a general F-line problem, not the swap?</div>
-        <div class="qa-verdict no">Not primarily</div>
-        <div class="qa-a">Weekends are the control group — and even they show some headway increases,
-        reflecting modest F-line drift. But weekday increases are <strong>far larger</strong>, because
-        Roosevelt Island residents face that baseline drift <em>plus</em> the M swap.
-        The swap is clearly the dominant cause.</div>
+        <div class="qa-verdict no">No</div>
+        <div class="qa-a">Weekends are the control group — the F still serves Roosevelt Island then, and
+        weekend daytime gaps are <strong>{'down' if weekend_pct < 0 else 'up'} {abs(weekend_pct):.0f}%</strong>
+        since the swap ({_we_b:.1f} → {_we_a:.1f} min). The F line did not get worse; weekday service did, and weekdays
+        are when the M replaced it.</div>
       </div>
       <div class="qa-item">
         <div class="qa-q">Did the MTA deliver its promised ≤1 min improvement?</div>
         <div class="qa-verdict no">No</div>
-        <div class="qa-a">Median increase is <strong>{am_delta:.1f} min</strong> (AM) and
-        <strong>{ev_delta:.1f} min</strong> (PM) — 3–4× the MTA's stated target.
+        <div class="qa-a">Added average wait is <strong>{am_wait_delta:.1f} min</strong> (AM) and
+        <strong>{ev_wait_delta:.1f} min</strong> (PM) — {miss_factor:.1f}× the MTA's stated target, using
+        the MTA's own wait formula.
         See the <a href="https://www.mta.info/document/186641" target="_blank"
         style="color:{TEXT_MUTED};">Staff Summary (Sep 15, 2025)</a>.</div>
       </div>
@@ -1013,6 +1317,125 @@ with col2:
       </div>
     </div>
     """, unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECTION 4b — HAS IT GOTTEN BETTER?
+# ═══════════════════════════════════════════════════════════════════════════════
+st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+st.markdown('<a id="trend"></a>', unsafe_allow_html=True)
+st.markdown('<div class="section-head">Has It Gotten Better?</div>', unsafe_allow_html=True)
+
+_ev_trend    = monthly_peak_medians(TREND_SERIES[0][1], TREND_SERIES[0][2])
+_ev_worst    = _ev_trend[_ev_trend["month"] >= pd.Timestamp(SWAP_DATE)]["median"].max()
+_ev_latest   = _ev_trend.iloc[-1]
+_latest_pct  = (_ev_latest["median"] - ev_nb_b) / ev_nb_b * 100
+
+st.markdown(f"""
+<div class="callout">
+  The MTA's commitment was not a one-month promise — peak M service was to be increased so the added
+  wait settled at about a minute. This chart tracks every month since the swap against the pre-swap
+  F-train baseline, so improvement (or its absence) is visible without taking anyone's word for it.
+  <br><br>
+  The evening commute peaked at a median of <strong>{_ev_worst:.1f} minutes</strong> between trains
+  and stood at <strong>{_ev_latest['median']:.1f} minutes in {_ev_latest['month']:%B %Y}</strong> —
+  still <strong>{_latest_pct:.0f}% above</strong> the {ev_nb_b:.1f}-minute F-train baseline. Whatever
+  drift there has been since winter, the gap the MTA promised to close is still open
+  {(date_max.year - post_start.year) * 12 + date_max.month - post_start.month} months on.
+</div>
+""", unsafe_allow_html=True)
+st.plotly_chart(monthly_trend_fig(df), use_container_width=True, config={"displayModeBar": False})
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECTION 4c — THE MTA'S RESPONSE
+# ═══════════════════════════════════════════════════════════════════════════════
+if _did is not None:
+    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+    st.markdown('<a id="response"></a>', unsafe_allow_html=True)
+    st.markdown('<div class="section-head">The MTA Responded — Here\'s What the Data Says</div>',
+                unsafe_allow_html=True)
+
+    st.markdown(f"""
+    <div class="callout">
+      In its <strong>April 23, 2026 response</strong>, the MTA attributed the longer waits at Roosevelt
+      Island to systemwide incidents and an unusually severe winter rather than to the swap itself.
+      That claim is testable. If citywide conditions were the cause, lines that were <em>not</em> swapped
+      should have degraded too. We compared Roosevelt Island against two controls — the
+      <strong>R at Queens Plaza</strong> (same Queens Blvd corridor, route unchanged) and the
+      <strong>7 at Queensboro Plaza</strong> (a separate division entirely) — using the same peak
+      windows and the MTA's own wait-time formula.
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.plotly_chart(did_fig(_did), use_container_width=True, config={"displayModeBar": False})
+
+    st.markdown(f"""
+    <div class="callout alarm">
+      Control stations moved <strong>{did_ctrl_mean:+.2f} minutes</strong> on average — essentially flat.
+      Roosevelt Island moved <strong>{did_treat_mean:+.2f} minutes</strong>. Subtracting one from the other
+      leaves <strong>{did_mean:+.2f} minutes of added wait attributable to the swap itself</strong>,
+      with {did_cells_pos} of {did_n_cells} peak cells statistically above zero and {did_cells_over} of
+      {did_n_cells} above the promised one minute. The systemwide explanation does not survive the comparison.
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECTION 4d — COMMITMENT SCORECARD
+# ═══════════════════════════════════════════════════════════════════════════════
+_score = load_supplement("commitment_scorecard.csv")
+if _score is not None:
+    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+    st.markdown('<a id="scorecard"></a>', unsafe_allow_html=True)
+    st.markdown('<div class="section-head">Every Written Commitment, Scored</div>', unsafe_allow_html=True)
+    st.markdown("""
+    <div class="callout">
+      Each row quotes a commitment the MTA made in writing, states the benchmark that would satisfy it,
+      and reports what the data measured. Verdicts come straight from
+      <code>scripts/14_commitment_scorecard.py</code>, which reads the CSV outputs of the analysis
+      scripts — the source file for every row is printed beneath it, so any verdict can be traced back
+      and checked.
+    </div>
+    """, unsafe_allow_html=True)
+
+    _tally = _score["verdict"].value_counts()
+    _tally_html = "".join(
+        f'<div class="score-tally-item">{int(_tally.get(v, 0))}<span>{label}</span></div>'
+        for v, label in [("FAIL", "commitments broken"), ("PARTIAL", "partly supported"),
+                         ("PASS", "commitments met"), ("UNKNOWN", "not yet measurable")]
+        if int(_tally.get(v, 0)) > 0
+    )
+    st.markdown(f'<div class="score-tally">{_tally_html}</div>', unsafe_allow_html=True)
+
+    def _clean_quote(text: str) -> str:
+        """The scorecard CSV carries a 'Verbatim:' prefix and nested quoting on
+        some rows — strip both so the page shows the commitment as written."""
+        t = str(text).strip()
+        for prefix in ("Verbatim:", "(Implied)"):
+            if t.startswith(prefix):
+                t = t[len(prefix):].strip()
+        return t.strip('"').strip()
+
+    for _, row in _score.iterrows():
+        verdict = str(row["verdict"]).strip().lower()
+        measured, benchmark = row.get("measured_value"), row.get("benchmark_value")
+        measure_html = (
+            f'Measured <b>{measured}</b> against a benchmark of {benchmark}.'
+            if pd.notna(measured) and pd.notna(benchmark) else ""
+        )
+        st.markdown(f"""
+        <div class="score-row {verdict}">
+          <div>
+            <span class="score-chip {verdict}">{row['verdict']}</span>
+            <span class="score-title">{row['title']}</span>
+          </div>
+          <div class="score-quote">"{_clean_quote(row['commitment_text'])}"
+            <span style="font-style:normal;">— {row['commitment_source']}</span></div>
+          <div class="score-measure">{measure_html} {_clean_quote(row['benchmark_text'])}</div>
+          <div class="score-source">{row['evidence_source']}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1031,7 +1454,9 @@ with st.expander("📊 How We Know This Is Real — Full Data & Methodology", ex
 
         **Station identification**
         Roosevelt Island confirmed as GTFS stop IDs B06N (northbound) and B06S (southbound),
-        verified against the official MTA Station & Complexes glossary (data.ny.gov, February 2026).
+        verified against the official
+        [MTA Subway Stations and Complexes](https://data.ny.gov/Transportation/MTA-Subway-Stations-and-Complexes/5f5g-n3cz/about_data)
+        glossary on data.ny.gov (re-checked July 2026).
 
         **Direction convention**
         - N (B06N) = Northbound = toward Queens (evening commute home)
@@ -1045,17 +1470,23 @@ with st.expander("📊 How We Know This Is Real — Full Data & Methodology", ex
     with col2:
         st.markdown(f"""
         **Analysis periods**
-        - Pre-swap: October 1 – December 7, 2025 (68 weekdays, F train)
-        - Post-swap: December 8, 2025 – February 15, 2026 (49 weekdays, M train)
+        - Pre-swap (F train): {pre_label} — {_bef_days} weekdays
+        - Post-swap (M train): {post_label} — {_aft_days} weekdays
+
+        The pre-swap baseline is **every F-train weekday in the archive before December 8, 2025**.
+        That deliberately includes the January–April 2025 data we pulled for the seasonality test,
+        so the baseline spans two seasons rather than one. Restricting it to the tighter
+        October 1 – December 7, 2025 window produces *larger* increases (about +100% evening and
+        +71% morning), so the figures published here are the conservative ones.
 
         **Holiday weeks**
-        December 22 – January 5 are included in post-swap figures. Excluding them
-        makes the post-swap numbers marginally worse, not better.
+        December 22 – January 5 are included in post-swap figures. Excluding them moves the post-swap
+        peak median from {post_med_all:.2f} to {post_med_nohol:.2f} minutes — immaterial either way.
 
-        **January 25 storm**
-        The winter storm accounts for ~6 percentage points of the overall increase.
-        Excluding it entirely, wait times are still up 54% (vs. 60% including the storm period).
-        The weather did not cause this.
+        **January 25, 2026 storm**
+        Waits were already {storm_pct_before:.0f}% above baseline before the storm; including it and
+        everything since leaves the figure at {storm_pct_after:.0f}%. With the post-swap record now
+        running through {date_max:%B %Y}, weather is not a plausible explanation.
 
         **Reproducibility**
         Complete data, scripts, and methodology are publicly available at
@@ -1066,12 +1497,13 @@ with st.expander("📊 How We Know This Is Real — Full Data & Methodology", ex
     st.markdown('<div class="section-head">Weekend Context — The Control Group</div>', unsafe_allow_html=True)
     st.markdown(f"""
     <div class="callout">
-      The F/M swap is <strong>weekday-only</strong>. Weekend F train data is the natural control group —
-      any headway changes on weekends <strong>cannot be attributed to the swap</strong>.
-      Notably, even weekends show some headway increases, suggesting the overall F line has seen modest
-      service degradation. <strong>This makes the weekday situation worse, not better:</strong>
-      Roosevelt Island residents face both a general F-line decline <em>and</em> the additional burden
-      of the M swap on weekdays. The gap between weekday and weekend increases isolates the swap's impact.
+      The F/M swap is <strong>weekday-only</strong>, so weekend F service is the natural control:
+      any change there <strong>cannot be attributed to the swap</strong>. Across daytime hours the median
+      weekend gap between trains went from <strong>{_we_b:.1f} to {_we_a:.1f} minutes
+      ({weekend_pct:+.0f}%)</strong> — the F serving Roosevelt Island on weekends did not deteriorate over
+      these months. That is precisely why the weekday numbers cannot be waved away as general F-line
+      decline: the degradation shows up on exactly the days, and in exactly the hours, that the M
+      replaced the F.
     </div>
     """, unsafe_allow_html=True)
     st.plotly_chart(weekend_fig(df), use_container_width=True, config={"displayModeBar": False})
@@ -1107,6 +1539,21 @@ st.markdown(f"""
     <div class="share-label" style="color:{TEXT_LIGHT}; font-weight:700; margin-top:0.5rem; font-size:0.95rem;">Share This Analysis</div>
     <div style="color:{TEXT_MUTED}; font-size:0.78rem; margin-top:0.2rem;">Copy link to clipboard</div>
   </div>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown(f"""
+<div class="callout">
+  <strong>Where this has already gone.</strong> The findings on this page have been filed with elected
+  officials and the MTA, and the record is public:
+  <ul style="margin:0.6rem 0 0 1.1rem; line-height:1.7;">
+    <li>Community Board 8 resolution calling for improved Roosevelt Island subway frequency</li>
+    <li>Joint letter to MTA Board Chair Janno Lieber</li>
+    <li>Briefing packets for Council Member Julie Menin, State Senator Liz Krueger, and
+        Assembly Member Rebecca Seawright</li>
+    <li>The MTA's written response of <strong>April 23, 2026</strong> — answered with data in
+        <a href="#response" style="color:{MTA_ORANGE};">the section above</a></li>
+  </ul>
 </div>
 """, unsafe_allow_html=True)
 

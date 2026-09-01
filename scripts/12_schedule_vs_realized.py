@@ -46,9 +46,10 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-SCRIPTS_DIR  = Path(__file__).parent
-GTFS_DIR     = SCRIPTS_DIR / "Resources" / "gtfs_static"
-RESULTS_DIR  = SCRIPTS_DIR / "results"
+SCRIPTS_DIR  = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPTS_DIR.parent   # data + analysis live in the project root
+GTFS_DIR     = PROJECT_ROOT / "Resources" / "gtfs_static"
+RESULTS_DIR  = PROJECT_ROOT / "results"
 OUT_DIR      = RESULTS_DIR / "schedule_vs_realized"
 HEADWAYS_CSV = RESULTS_DIR / "roosevelt_island_headways.csv"
 

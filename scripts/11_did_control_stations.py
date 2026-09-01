@@ -47,8 +47,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
-SCRIPTS_DIR = Path(__file__).parent
-RESULTS_DIR = SCRIPTS_DIR / "results"
+SCRIPTS_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPTS_DIR.parent   # data + analysis live in the project root
+RESULTS_DIR = PROJECT_ROOT / "results"
 OUT_DIR     = RESULTS_DIR / "did_control_stations"
 
 RI_HEADWAYS_CSV   = RESULTS_DIR / "roosevelt_island_headways.csv"

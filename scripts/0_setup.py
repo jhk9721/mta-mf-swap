@@ -23,9 +23,10 @@ import subprocess
 import urllib.request
 from pathlib import Path
 
-SCRIPTS_DIR = Path(__file__).parent
-RAW_DATA_DIR = SCRIPTS_DIR / "raw_data"
-RESULTS_DIR  = SCRIPTS_DIR / "results"
+SCRIPTS_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPTS_DIR.parent   # data + analysis live in the project root
+RAW_DATA_DIR = PROJECT_ROOT / "raw_data"
+RESULTS_DIR  = PROJECT_ROOT / "results"
 
 REQUIRED_PACKAGES = [
     ("requests",    "2.31.0"),
@@ -80,7 +81,7 @@ def check_packages():
 def check_disk_space():
     print("\n── Disk Space ──────────────────────────────────────────────────")
     try:
-        stat = os.statvfs(SCRIPTS_DIR)
+        stat = os.statvfs(PROJECT_ROOT)
         free_gb = (stat.f_bavail * stat.f_frsize) / (1024 ** 3)
         print(f"  Free disk space: {free_gb:.1f} GB")
         if free_gb < MIN_DISK_GB:
@@ -93,7 +94,7 @@ def check_disk_space():
         import ctypes
         free_bytes = ctypes.c_ulonglong(0)
         ctypes.windll.kernel32.GetDiskFreeSpaceExW(
-            str(SCRIPTS_DIR), None, None, ctypes.byref(free_bytes)
+            str(PROJECT_ROOT), None, None, ctypes.byref(free_bytes)
         )
         free_gb = free_bytes.value / (1024 ** 3)
         print(f"  Free disk space: {free_gb:.1f} GB")

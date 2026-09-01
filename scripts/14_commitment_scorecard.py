@@ -34,8 +34,9 @@ import sys
 from pathlib import Path
 import pandas as pd
 
-SCRIPTS_DIR = Path(__file__).parent
-RESULTS_DIR = SCRIPTS_DIR / "results"
+SCRIPTS_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPTS_DIR.parent   # data + analysis live in the project root
+RESULTS_DIR = PROJECT_ROOT / "results"
 
 # Verdict styling
 VERDICT_GLYPH = {

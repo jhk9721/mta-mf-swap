@@ -1,48 +1,34 @@
 """
-SCRIPT 1b: DOWNLOAD — EXTENDED (Seasonality + Gap Fill)
+SCRIPT 1b: DOWNLOAD — GAP FILL / VERIFY
 =========================================================
-Downloads CSV data from subwaydata.nyc for months not covered by
-1_download.py, and fills gaps left by that script:
+Second pass over the same window 1_download.py covers: January 1, 2025
+through today. 1_download.py now pulls the entire range in one go, so this
+script no longer adds new months — it exists to close gaps:
 
-  NEW months (downloaded by this script):
-    - January 2025    <- year-ago F train baseline (seasonality test)
-    - February 2025   <- year-ago F train baseline (seasonality test)
-    - March 2025      <- optional: extends trend window
-    - April 2025      <- optional: extends trend window
-    - February 2026   <- gap fill (1_download.py may have cut off at Feb 15;
-                         files already on disk are skipped automatically)
-    - March 2026      <- post-swap trend
-    - April 2026      <- post-swap trend
-    - May 2026        <- post-swap trend
-    - June 2026       <- post-swap trend
-    - July 2026       <- post-swap trend through today (July 2026)
+  - Days that 404'd on the earlier run because subwaydata.nyc had not
+    published them yet (the site runs a day or two behind).
+  - Days lost to a network error or an interrupted run.
+  - Days published since the last time you downloaded.
 
-  ALREADY downloaded by 1_download.py (not re-downloaded here):
-    - October 2025, November 2025, December 2025  (pre-swap)
-    - January 2026                                (post-swap)
+Files already on disk are skipped, so this is cheap to run and safe to repeat.
+It finishes by listing exactly which dates are still missing, so you know
+whether the corpus is complete before running the analysis.
 
-WHY THIS MATTERS:
-  1. Seasonality test: Krueger's office asked whether Jan/Feb are simply
-     worse months for subway service regardless of the swap. Jan-Feb 2025
-     (F train, same season) vs Jan-Feb 2026 (M train, post-swap) answers
-     that directly.
-  2. Gap fill: subwaydata.nyc data may not have been available past Feb 15
-     when 1_download.py was last run. This script completes the picture
-     through today.
+WHY THE WINDOW STARTS IN JANUARY 2025:
+  Krueger's office asked whether Jan/Feb are simply worse months for subway
+  service regardless of the swap. Jan-Feb 2025 (F train, same season) vs
+  Jan-Feb 2026 (M train, post-swap) answers that directly. The rest of 2025
+  extends the trend window and supports the seasonality controls.
 
 HOW TO RUN:
-  1. Run 1_download.py first if you haven't already.
-  2. Run this script from the same directory:
+  1. Run 1_download.py first.
+  2. Then run this script:
          python3 1b_download_extended.py
-  3. All files land in the same "raw_data/" folder as 1_download.py.
-     The analysis scripts pick up everything in that folder automatically.
+  3. All files land in the "raw_data" folder at the project root, the same
+     place 1_download.py writes to. The analysis scripts pick up everything
+     in that folder automatically.
   4. Re-run 3_analyze.py and 5_seasonality_analysis.py to incorporate
-     the new data.
-
-ESTIMATED DOWNLOAD:
-  ~250 days of new data on a first run -> roughly 250-500 MB compressed.
-  Allow 20-40 minutes depending on your connection.
-  Files already on disk are skipped, so re-runs are safe.
+     any new data.
 """
 
 import requests
@@ -52,34 +38,38 @@ from datetime import date, timedelta
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
-OUTPUT_DIR = "raw_data"   # Same folder as 1_download.py — intentional.
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, "raw_data")   # Same folder as 1_download.py — intentional.
 
-# Months to download. Files already on disk are skipped automatically.
-MONTHS = [
-    (2025,  1),   # January 2025   ← year-ago F train baseline (seasonality)
-    (2025,  2),   # February 2025  ← year-ago F train baseline (seasonality)
-    (2025,  3),   # March 2025     ← optional: extends trend window
-    (2025,  4),   # April 2025     ← optional: extends trend window
-    (2026,  2),   # February 2026  ← completes Feb (1_download.py may have cut off at Feb 15)
-    (2026,  3),   # March 2026     ← post-swap trend
-    (2026,  4),   # April 2026     ← post-swap trend
-    (2026,  5),   # May 2026       ← post-swap trend
-    (2026,  6),   # June 2026      ← post-swap trend
-    (2026,  7),   # July 2026      ← post-swap trend through today
-]
+# Same window as 1_download.py — keep these two in sync if the study period
+# changes. END_DATE is resolved at run time, so "today" always means today.
+START_DATE = date(2025, 1, 1)
+END_DATE   = date.today()
 
 BASE_URL = "https://subwaydata.nyc/data"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def get_all_dates(year: int, month: int) -> list:
-    """Return every date in the given year/month."""
-    d = date(year, month, 1)
-    dates = []
-    while d.month == month:
-        dates.append(d)
-        d += timedelta(days=1)
-    return dates
+def iter_months(start: date, end: date):
+    """
+    Walk the range month by month so progress stays readable.
+
+    Yields (year, month, dates) where `dates` is the list of days of that
+    month falling inside [start, end] — the first and last months are
+    clipped to the range bounds.
+    """
+    cursor = date(start.year, start.month, 1)
+    while cursor <= end:
+        nxt = (date(cursor.year + 1, 1, 1) if cursor.month == 12
+               else date(cursor.year, cursor.month + 1, 1))
+        days = []
+        d = max(cursor, start)
+        while d < nxt and d <= end:
+            days.append(d)
+            d += timedelta(days=1)
+        if days:
+            yield cursor.year, cursor.month, days
+        cursor = nxt
 
 
 def download_file(d: date, output_dir: str) -> str:
@@ -120,38 +110,29 @@ def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     print("Roosevelt Island MTA Analysis — Extended Download")
     print("=" * 55)
-    print(f"Saving files to: {os.path.abspath(OUTPUT_DIR)}\n")
-    print("Purpose: (1) Jan/Feb 2025 baseline for seasonality test")
-    print("         (2) Fill Feb 16-28 2026 gap from 1_download.py")
-    print("         (3) Extend post-swap trend through the current month\n")
+    print(f"Saving files to: {os.path.abspath(OUTPUT_DIR)}")
+    print(f"Date range:      {START_DATE} to {END_DATE} "
+          f"({(END_DATE - START_DATE).days + 1} days)\n")
+    print("Purpose: fill any dates missing from the study window —")
+    print("         days not yet published on the earlier run, days lost to")
+    print("         network errors, and days published since.\n")
 
     downloaded, skipped, missing, failed = 0, 0, 0, 0
     total_dates = 0
+    gaps = []
 
-    for year, month in MONTHS:
-        dates = get_all_dates(year, month)
+    for year, month, dates in iter_months(START_DATE, END_DATE):
         total_dates += len(dates)
         month_label = date(year, month, 1).strftime("%B %Y")
-        purpose = {
-            (2025, 1): "year-ago F train baseline",
-            (2025, 2): "year-ago F train baseline",
-            (2025, 3): "extended trend window",
-            (2025, 4): "extended trend window",
-            (2026, 2): "gap fill (complete Feb 2026)",
-            (2026, 3): "post-swap trend",
-            (2026, 4): "post-swap trend",
-            (2026, 5): "post-swap trend",
-            (2026, 6): "post-swap trend",
-            (2026, 7): "post-swap trend through today",
-        }.get((year, month), "")
-        print(f"── {month_label}  [{purpose}]  ({len(dates)} days) ──────────")
+        print(f"── {month_label}  ({len(dates)} days) ──────────────────────")
         for d in dates:
             result = download_file(d, OUTPUT_DIR)
             if result == "ok":       downloaded += 1
             elif result == "skipped": skipped += 1
-            elif result == "missing": missing += 1
-            else:                    failed += 1
-            time.sleep(0.5)   # polite rate limit
+            elif result == "missing": missing += 1; gaps.append(d)
+            else:                    failed += 1; gaps.append(d)
+            if result != "skipped":
+                time.sleep(0.5)   # polite rate limit; no need to pause on skips
 
     available = downloaded + skipped
     coverage = 100 * available / total_dates if total_dates > 0 else 0
@@ -165,14 +146,21 @@ def main():
     print(f"  Coverage             : {available}/{total_dates} days ({coverage:.0f}%)")
     print(f"  Files are in         : {os.path.abspath(OUTPUT_DIR)}")
 
+    if gaps:
+        print(f"\n── Dates still missing ({len(gaps)}) ─────────────────────────")
+        print("  The most recent day or two is normally just publication lag.")
+        for d in gaps:
+            print(f"    {d}")
+
     if failed > 0:
         print(f"\n  [WARN] {failed} file(s) failed. Re-run to retry.")
     if coverage < 80:
         print(f"\n  [WARN] Low coverage ({coverage:.0f}%). "
               "Seasonality results may be unreliable.")
-    if coverage >= 80:
-        print(f"\n  Ready for seasonality analysis.")
-        print(f"  Next step: python3 5_seasonality_analysis.py")
+    else:
+        print(f"\n  Ready for analysis.")
+        print(f"  Next steps: python3 3_analyze.py")
+        print(f"              python3 5_seasonality_analysis.py")
 
 
 if __name__ == "__main__":

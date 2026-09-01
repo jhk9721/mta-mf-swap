@@ -15,7 +15,8 @@ import glob
 import pandas as pd
 import io
 
-RAW_DATA_DIR = "raw_data"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+RAW_DATA_DIR = os.path.join(PROJECT_ROOT, "raw_data")
 
 def main():
     files = sorted(glob.glob(os.path.join(RAW_DATA_DIR, "*.tar.xz")))

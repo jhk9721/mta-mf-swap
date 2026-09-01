@@ -12,7 +12,7 @@ from datetime import date
 
 # Paths are resolved relative to this script's location so the script works
 # regardless of which directory it is invoked from.
-RESULTS_DIR   = Path(__file__).parent / "results"
+RESULTS_DIR   = Path(__file__).resolve().parent.parent / "results"
 COMMUNITY_DIR = RESULTS_DIR / "community"
 SWAP_DATE     = date(2025, 12, 8)
 

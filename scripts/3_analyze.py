@@ -53,8 +53,11 @@ warnings.filterwarnings("ignore")
 # CONFIGURATION
 # ══════════════════════════════════════════════════════════════════════════════
 
-RAW_DATA_DIR = "raw_data"
-RESULTS_DIR  = "results"
+# Paths are anchored to the project root (the parent of scripts/) so data and
+# analysis land there no matter which directory the script is invoked from.
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+RAW_DATA_DIR = os.path.join(PROJECT_ROOT, "raw_data")
+RESULTS_DIR  = os.path.join(PROJECT_ROOT, "results")
 
 # Roosevelt Island — confirmed from MTA official GTFS station glossary
 ROOSEVELT_ISLAND_STOP_IDS = {"B06N", "B06S"}
@@ -967,6 +970,16 @@ def write_report(df_hw: pd.DataFrame,
         w = "LONGER ▲" if d > 0 else "SHORTER ▼"
         return f"{abs(d):.1f} min {w} ({abs(p):.0f}%)"
 
+    # Describe the window actually analysed rather than a hardcoded one — the
+    # pre/post split is date >= SWAP_DATE, so both ends follow the corpus.
+    _pre  = df_hw[df_hw["swap_period"] == "Before swap"]["arrival_date"]
+    _post = df_hw[df_hw["swap_period"] == "After swap"]["arrival_date"]
+    _fmtd = lambda s: pd.to_datetime(s).strftime("%b %-d, %Y")
+    pre_min,  pre_max  = _fmtd(_pre.min()),  _fmtd(_pre.max())
+    post_min, post_max = _fmtd(_post.min()), _fmtd(_post.max())
+    pre_days  = pd.to_datetime(_pre).nunique()
+    post_days = pd.to_datetime(_post).nunique()
+
     report = f"""
 ROOSEVELT ISLAND SUBWAY — HEADWAY ANALYSIS
 F/M Train Swap | Before vs. After December 8, 2025
@@ -975,8 +988,8 @@ Station: Roosevelt Island (GTFS: B06N northbound, B06S southbound)
 ================================================================
 
 STUDY DESIGN
-  Pre-swap:  Oct 1 – Dec 7, 2025
-  Post-swap: Dec 8, 2025 – Feb 15, 2026
+  Pre-swap:  {pre_min} – {pre_max}  ({pre_days} weekdays+weekends of data)
+  Post-swap: {post_min} – {post_max}  ({post_days} days of data)
   Time buckets (identical clock boundaries on all days):
     1. Early AM          12:00 AM –  6:00 AM
     2. Morning Rush       6:00 AM –  9:00 AM  (weekdays)

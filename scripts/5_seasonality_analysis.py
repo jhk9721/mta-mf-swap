@@ -59,9 +59,10 @@ warnings.filterwarnings("ignore")
 # CONFIGURATION
 # ══════════════════════════════════════════════════════════════════════════════
 
-SCRIPTS_DIR  = Path(__file__).parent
-RAW_DATA_DIR = SCRIPTS_DIR / "raw_data"
-RESULTS_DIR  = SCRIPTS_DIR / "results"
+SCRIPTS_DIR  = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPTS_DIR.parent   # data + analysis live in the project root
+RAW_DATA_DIR = PROJECT_ROOT / "raw_data"
+RESULTS_DIR  = PROJECT_ROOT / "results"
 OUT_DIR      = RESULTS_DIR / "seasonality"
 
 ROOSEVELT_ISLAND_STOP_IDS = {"B06N", "B06S"}

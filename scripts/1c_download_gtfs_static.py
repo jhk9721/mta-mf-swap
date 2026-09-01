@@ -34,8 +34,9 @@ from pathlib import Path
 
 GTFS_URL = "http://web.mta.info/developers/data/nyct/subway/google_transit.zip"
 
-SCRIPTS_DIR = Path(__file__).parent
-OUT_DIR     = SCRIPTS_DIR / "Resources" / "gtfs_static"
+SCRIPTS_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPTS_DIR.parent   # data + analysis live in the project root
+OUT_DIR     = PROJECT_ROOT / "Resources" / "gtfs_static"
 
 EXPECTED_FILES = {
     "stops.txt", "stop_times.txt", "trips.txt", "routes.txt", "calendar.txt",

@@ -29,8 +29,14 @@ def init_analytics():
     if "analytics_page_views" not in st.session_state:
         st.session_state["analytics_page_views"] = 0
 
-    # Check which analytics provider is configured
-    analytics_config = st.secrets.get("analytics", {})
+    # Check which analytics provider is configured. Reading st.secrets raises
+    # when no secrets.toml exists at all (a fresh clone, or a deploy before
+    # secrets are set) — fall back to the logging-only tier instead of taking
+    # the whole page down over analytics.
+    try:
+        analytics_config = st.secrets.get("analytics", {})
+    except Exception:
+        analytics_config = {}
 
     if analytics_config.get("google_analytics_id"):
         _inject_google_analytics(analytics_config["google_analytics_id"])

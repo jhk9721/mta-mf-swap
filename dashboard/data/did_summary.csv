@@ -1,0 +1,9 @@
+time_bucket,direction,control_label,control_full,treat_wait_pre,treat_wait_post,treat_delta,ctrl_wait_pre,ctrl_wait_post,ctrl_delta,did,did_ci_low,did_ci_high,n_t_pre,n_t_post,n_c_pre,n_c_post
+Morning Rush (6–9 AM),Southbound,R @ G21,Queens Plaza R train (route unchanged),2.72,4.08,1.36,4.07,3.79,-0.28,1.64,1.5,1.77,4067,3138,2759,3455
+Morning Rush (6–9 AM),Southbound,7 @ 718,Queensboro Plaza 7 train (independent line),2.72,4.08,1.36,1.61,1.61,-0.01,1.37,1.27,1.46,4067,3138,6746,8175
+Morning Rush (6–9 AM),Northbound,R @ G21,Queens Plaza R train (route unchanged),3.6,4.67,1.07,4.92,5.03,0.11,0.96,0.76,1.18,3045,2742,2026,2317
+Morning Rush (6–9 AM),Northbound,7 @ 718,Queensboro Plaza 7 train (independent line),3.6,4.67,1.07,1.52,1.5,-0.02,1.09,0.98,1.21,3045,2742,7366,8933
+Evening Rush (4–7 PM),Southbound,R @ G21,Queens Plaza R train (route unchanged),2.83,4.12,1.28,3.96,3.79,-0.17,1.46,1.34,1.57,3973,3166,2814,3418
+Evening Rush (4–7 PM),Southbound,7 @ 718,Queensboro Plaza 7 train (independent line),2.83,4.12,1.28,1.65,1.62,-0.03,1.31,1.23,1.4,3973,3166,6528,8308
+Evening Rush (4–7 PM),Northbound,R @ G21,Queens Plaza R train (route unchanged),2.61,4.05,1.44,3.86,3.67,-0.19,1.63,1.49,1.77,4276,3191,2901,3542
+Evening Rush (4–7 PM),Northbound,7 @ 718,Queensboro Plaza 7 train (independent line),2.61,4.05,1.44,1.53,1.52,-0.01,1.45,1.35,1.54,4276,3191,7022,8904

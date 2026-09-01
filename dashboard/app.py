@@ -501,6 +501,35 @@ ev_wait_delta = ev_delta / 2
 am_wait_delta = am_delta / 2
 miss_factor   = ((ev_wait_delta + am_wait_delta) / 2) / 1.0
 
+# ── Peak train supply ─────────────────────────────────────────────────────────
+# Headways are a derived statistic; this is a raw count of trains that stopped at
+# the platform. It needs no baseline argument, no outlier rule and no
+# median-vs-mean discussion, which makes it the hardest figure here to contest.
+# It is also the direct test of the Staff Summary's promise that "AM and PM
+# peak-hour M service will be increased".
+PEAK_HOURS = 6  # 6-9 AM plus 4-7 PM
+
+def trains_per_hour(direction: str, period: str) -> float:
+    """Average weekday peak arrivals per hour at Roosevelt Island.
+
+    Divides by the number of distinct weekday dates actually present in the
+    data, so missing days never inflate the rate.
+    """
+    sub = df[
+        (df["day_type"]    == "Weekday") &
+        (df["direction"]   == direction) &
+        (df["swap_period"] == period) &
+        (df["time_bucket"].isin(["Morning Rush (6–9 AM)", "Evening Rush (4–7 PM)"]))
+    ]
+    n_days = sub["arrival_date"].nunique()
+    return len(sub) / n_days / PEAK_HOURS if n_days else 0.0
+
+tph_nb_b, tph_nb_a = trains_per_hour("N", "Before swap"), trains_per_hour("N", "After swap")
+tph_sb_b, tph_sb_a = trains_per_hour("S", "Before swap"), trains_per_hour("S", "After swap")
+tph_nb_pct = (tph_nb_a - tph_nb_b) / tph_nb_b * 100 if tph_nb_b else 0.0
+tph_sb_pct = (tph_sb_a - tph_sb_b) / tph_sb_b * 100 if tph_sb_b else 0.0
+tph_worst_pct = min(tph_nb_pct, tph_sb_pct)
+
 # Extreme wait statistics — both directions, swap-active hours, weekdays
 _ew_bef = df[df["within_swap_window"] & (df["day_type"] == "Weekday") & (df["swap_period"] == "Before swap")]["headway_min"]
 _ew_aft = df[df["within_swap_window"] & (df["day_type"] == "Weekday") & (df["swap_period"] == "After swap")]["headway_min"]
@@ -614,29 +643,36 @@ def metric_card(label, value, sub, style="alarm"):
       <div class="metric-sub">{sub}</div>
     </div>"""
 
-c1, c2, c3, c4 = st.columns(4)
+c1, c2, c3, c4, c5 = st.columns(5)
 with c1:
+    st.markdown(metric_card(
+        "Peak Trains Per Hour ↓",
+        f"{tph_worst_pct:.0f}%",
+        f"Northbound {tph_nb_b:.1f} → {tph_nb_a:.1f} · southbound {tph_sb_b:.1f} → {tph_sb_a:.1f} per hour",
+        "alarm"
+    ), unsafe_allow_html=True)
+with c2:
     st.markdown(metric_card(
         "Evening Commute Home ↑",
         f"+{ev_pct:.0f}%",
         f"Median: {ev_nb_b:.1f} → {ev_nb_a:.1f} min northbound (4–7 PM)",
         "alarm"
     ), unsafe_allow_html=True)
-with c2:
+with c3:
     st.markdown(metric_card(
         "Morning Commute to Manhattan ↑",
         f"+{am_pct:.0f}%",
         f"Median: {am_sb_b:.1f} → {am_sb_a:.1f} min southbound (6–9 AM)",
         "alarm"
     ), unsafe_allow_html=True)
-with c3:
+with c4:
     st.markdown(metric_card(
         "Extra Wait Time Per Month",
         f"{monthly_extra:.0f} min",
         f"Added wait on a weekday round trip (AM + PM), 22 working days",
         "warning"
     ), unsafe_allow_html=True)
-with c4:
+with c5:
     st.markdown(metric_card(
         "Evening Waits Over 10 Minutes",
         f"{pct_over_10_after:.0f}%",
@@ -1001,6 +1037,55 @@ def monthly_trend_fig(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
+def train_supply_fig() -> go.Figure:
+    """Peak trains per hour, before vs. after, by direction.
+
+    Deliberately a raw count rather than a derived statistic: it tests the Staff
+    Summary's promise that "AM and PM peak-hour M service will be increased"
+    without needing a baseline argument, an outlier rule, or a median-vs-mean
+    discussion.
+    """
+    groups = ["Northbound<br>(→ Queens/home)", "Southbound<br>(→ Manhattan)"]
+    before = [tph_nb_b, tph_sb_b]
+    after  = [tph_nb_a, tph_sb_a]
+    pct    = [tph_nb_pct, tph_sb_pct]
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        name="Before (F)", x=groups, y=before,
+        marker_color=BLUE_BEFORE, offsetgroup=0,
+        hovertemplate="<b>%{x}</b><br>Before the swap: %{y:.1f} trains/hour<extra></extra>",
+        text=[f"{v:.1f}" for v in before],
+        textposition="outside", textfont=dict(color=BLUE_BEFORE, size=12),
+    ))
+    fig.add_trace(go.Bar(
+        name="After (M)", x=groups, y=after,
+        marker_color=RED_AFTER, offsetgroup=1,
+        hovertemplate="<b>%{x}</b><br>After the swap: %{y:.1f} trains/hour<extra></extra>",
+        text=[f"{v:.1f}" for v in after],
+        textposition="outside", textfont=dict(color=RED_AFTER, size=12),
+    ))
+    top = max(before + after)
+    for g, p in zip(groups, pct):
+        fig.add_annotation(x=g, y=top * 1.22, text=f"<b>{p:+.0f}%</b>",
+                           showarrow=False, font=dict(size=13, color=RED_AFTER))
+    fig.update_layout(
+        **PLOTLY_LAYOUT,
+        title=dict(
+            text="<b>Peak Trains Per Hour at Roosevelt Island</b><br>"
+                 "<sup>Weekday rush hours (6–9 AM and 4–7 PM). A count of trains that stopped — "
+                 "not a modelled statistic.</sup>",
+            font=dict(size=14),
+        ),
+        barmode="group", bargap=0.52, bargroupgap=0.04,
+        yaxis_title="Trains per hour",
+        yaxis_range=[0, top * 1.38],
+        height=420,
+        legend=dict(**LEGEND_BASE, orientation="h", x=0.5, xanchor="center", y=-0.18, yanchor="top"),
+    )
+    return fig
+
+
 def sensitivity_fig(df: pd.DataFrame) -> go.Figure:
     from datetime import date as date_type
     storm_date = date_type(2026, 1, 25)
@@ -1261,6 +1346,35 @@ with col2:
       <div class="promise-attribution">
         Computed the MTA's own way: average wait = half the gap between trains.
         That is {miss_factor:.1f}× the commitment — and Roosevelt Island has no alternative subway line.
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# The same Staff Summary promised MORE peak service, not just a capped wait.
+# Train counts test that promise directly, without any derived statistic.
+st.markdown('<div class="section-head">The Promise Was More Trains. There Are Fewer.</div>', unsafe_allow_html=True)
+
+col1, col2 = st.columns([3, 2])
+with col1:
+    st.plotly_chart(train_supply_fig(), use_container_width=True, config={"displayModeBar": False})
+with col2:
+    st.markdown(f"""
+    <div style="background:{MID_NAVY}; border-left:4px solid {MTA_ORANGE}; padding:1.5rem;
+                border-radius:0 8px 8px 0; margin-top:2.5rem;">
+      <div class="promise-label" style="color:{MTA_ORANGE};">The simplest test</div>
+      <div class="promise-quote" style="font-size:1rem; line-height:1.6;">
+        The Staff Summary committed that <strong style="color:{TEXT_LIGHT};">"AM and PM peak-hour
+        M service will be increased."</strong><br><br>
+        Counting the trains that actually stopped at Roosevelt Island during rush hour,
+        service fell <strong style="color:{TEXT_LIGHT};">{abs(tph_nb_pct):.0f}%</strong> northbound and
+        <strong style="color:{TEXT_LIGHT};">{abs(tph_sb_pct):.0f}%</strong> southbound.
+      </div>
+      <div class="promise-attribution">
+        This is a count of arrivals, not a modelled statistic — no baseline choice,
+        no outlier rule, no median-versus-mean question. It is the same real-time feed
+        the MTA publishes.
       </div>
     </div>
     """, unsafe_allow_html=True)
